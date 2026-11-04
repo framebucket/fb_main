@@ -7,7 +7,7 @@ This workspace contains a Spring Boot backend and a React frontend for the photo
 - Public home page, photographer registration and login.
 - Session-based authentication with an HTTP-only session cookie and CSRF protection.
 - Welcome page with Customer module and Data module tabs.
-- PostgreSQL schema migration and example SQL queries.
+- PostgreSQL schema migrations and example SQL queries. `fb_user` references an optional `fb_subscription` plan.
 - Local Vite proxy from the React development server to Spring Boot.
 
 The Customer and Data tabs are starting points only. Their business workflows, photo storage and processing are not implemented in this user-module starter.
@@ -35,7 +35,7 @@ Open the backend folder in IntelliJ IDEA as a Maven project, or run from a termi
     cd backend
     mvn spring-boot:run
 
-The backend runs at http://localhost:8080. Flyway applies the SQL migration automatically on startup.
+The backend runs at http://localhost:8080. Flyway applies the SQL migrations automatically on startup, including the rename to `fb_user` and creation of `fb_subscription`.
 
 ## 3. Run the frontend
 
@@ -58,6 +58,8 @@ To call a different backend URL, copy frontend/.env.example to frontend/.env.loc
 - POST /api/auth/logout — ends the session.
 
 Registration fields: fullName, studioName (optional), email and password (minimum 12 characters). The API normalizes email addresses to lowercase and stores only a BCrypt password hash.
+
+The `fb_user.subscription_id` foreign key is nullable for now because subscription selection is not part of registration yet. Subscription plans can use monthly, yearly or lifetime billing cycles; no sample prices or plans are inserted.
 
 ## Importing the projects
 

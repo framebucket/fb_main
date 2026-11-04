@@ -1,8 +1,12 @@
 package com.framebucket.auth.model;
 
+import com.framebucket.subscription.model.SubscriptionPlan;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
@@ -11,7 +15,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 @Entity
-@Table(name = "photographer_users")
+@Table(name = "fb_user")
 public class PhotographerUser {
     @Id
     private UUID id;
@@ -33,6 +37,10 @@ public class PhotographerUser {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "subscription_id")
+    private SubscriptionPlan subscription;
 
     protected PhotographerUser() {
     }
@@ -83,5 +91,9 @@ public class PhotographerUser {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public SubscriptionPlan getSubscription() {
+        return subscription;
     }
 }

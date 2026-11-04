@@ -18,9 +18,9 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.context.SecurityContextHolderStrategy;
-import org.springframework.security.core.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -105,7 +105,7 @@ public class AuthController {
 
     @GetMapping("/me")
     public UserResponse currentUser(
-            org.springframework.security.core.annotation.AuthenticationPrincipal PhotographerPrincipal principal
+            @org.springframework.security.core.annotation.AuthenticationPrincipal PhotographerPrincipal principal
     ) {
         return authService.toResponse(principal);
     }
