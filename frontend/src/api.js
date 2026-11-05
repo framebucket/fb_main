@@ -63,6 +63,9 @@ async function request(path, options = {}) {
 
 export const api = {
   register: (form) => request('/api/auth/register', { method: 'POST', body: form }),
+  plans: () => request('/api/subscriptions'),
+  verifyEmail: (token) => request('/api/auth/verify-email', { method: 'POST', body: { token } }),
+  resendVerification: (email) => request('/api/auth/resend-verification', { method: 'POST', body: { email } }),
   login: async (form) => {
     const profile = await request('/api/auth/login', { method: 'POST', body: form });
     csrfToken = null;

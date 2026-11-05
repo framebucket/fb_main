@@ -37,6 +37,27 @@ public class SubscriptionPlan {
     @Column(name = "billing_cycle", nullable = false, length = 20)
     private BillingCycle billingCycle;
 
+    @Column(name = "trial_days", nullable = false)
+    private int trialDays;
+
+    @Column(name = "customer_order_tracking", nullable = false)
+    private boolean customerOrderTracking;
+
+    @Column(name = "ai_image_delivery", nullable = false)
+    private boolean aiImageDelivery;
+
+    @Column(name = "quotation_calendar", nullable = false)
+    private boolean quotationCalendar;
+
+    @Column(name = "data_module_enabled", nullable = false)
+    private boolean dataModuleEnabled;
+
+    @Column(name = "raw_photo_selection", nullable = false)
+    private boolean rawPhotoSelection;
+
+    @Column(name = "max_storage_gb")
+    private Long maxStorageGb;
+
     @Column(nullable = false)
     private boolean active = true;
 
@@ -52,7 +73,14 @@ public class SubscriptionPlan {
             String description,
             BigDecimal priceAmount,
             String currencyCode,
-            BillingCycle billingCycle
+            BillingCycle billingCycle,
+            int trialDays,
+            boolean customerOrderTracking,
+            boolean aiImageDelivery,
+            boolean quotationCalendar,
+            boolean dataModuleEnabled,
+            boolean rawPhotoSelection,
+            Long maxStorageGb
     ) {
         this.id = UUID.randomUUID();
         this.planCode = planCode;
@@ -61,6 +89,13 @@ public class SubscriptionPlan {
         this.priceAmount = priceAmount;
         this.currencyCode = currencyCode;
         this.billingCycle = billingCycle;
+        this.trialDays = trialDays;
+        this.customerOrderTracking = customerOrderTracking;
+        this.aiImageDelivery = aiImageDelivery;
+        this.quotationCalendar = quotationCalendar;
+        this.dataModuleEnabled = dataModuleEnabled;
+        this.rawPhotoSelection = rawPhotoSelection;
+        this.maxStorageGb = maxStorageGb;
         this.active = true;
     }
 
@@ -97,6 +132,34 @@ public class SubscriptionPlan {
 
     public BillingCycle getBillingCycle() {
         return billingCycle;
+    }
+
+    public int getTrialDays() {
+        return trialDays;
+    }
+
+    public boolean isCustomerOrderTracking() {
+        return customerOrderTracking;
+    }
+
+    public boolean isAiImageDelivery() {
+        return aiImageDelivery;
+    }
+
+    public boolean isQuotationCalendar() {
+        return quotationCalendar;
+    }
+
+    public boolean isDataModuleEnabled() {
+        return dataModuleEnabled;
+    }
+
+    public boolean isRawPhotoSelection() {
+        return rawPhotoSelection;
+    }
+
+    public Long getMaxStorageGb() {
+        return maxStorageGb;
     }
 
     public boolean isActive() {

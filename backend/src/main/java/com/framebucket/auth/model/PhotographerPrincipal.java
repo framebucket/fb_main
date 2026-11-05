@@ -1,5 +1,6 @@
 package com.framebucket.auth.model;
 
+import com.framebucket.subscription.model.SubscriptionPlan;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,7 +16,13 @@ public final class PhotographerPrincipal implements UserDetails {
     private final String email;
     private final String passwordHash;
     private final boolean active;
+    private final boolean emailVerified;
     private final java.time.Instant createdAt;
+    private final java.util.UUID subscriptionId;
+    private final String subscriptionCode;
+    private final String subscriptionName;
+    private final java.time.Instant trialEndsAt;
+    private final boolean dataModuleEnabled;
 
     private PhotographerPrincipal(PhotographerUser user) {
         this.id = user.getId();
@@ -24,7 +31,14 @@ public final class PhotographerPrincipal implements UserDetails {
         this.email = user.getEmail();
         this.passwordHash = user.getPasswordHash();
         this.active = user.isActive();
+        this.emailVerified = user.isEmailVerified();
         this.createdAt = user.getCreatedAt();
+        this.trialEndsAt = user.getTrialEndsAt();
+        SubscriptionPlan subscription = user.getSubscription();
+        this.subscriptionId = subscription == null ? null : subscription.getId();
+        this.subscriptionCode = subscription == null ? null : subscription.getPlanCode();
+        this.subscriptionName = subscription == null ? null : subscription.getPlanName();
+        this.dataModuleEnabled = subscription != null && subscription.isDataModuleEnabled();
     }
 
     public static PhotographerPrincipal from(PhotographerUser user) {
@@ -45,6 +59,30 @@ public final class PhotographerPrincipal implements UserDetails {
 
     public java.time.Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+
+    public java.util.UUID getSubscriptionId() {
+        return subscriptionId;
+    }
+
+    public String getSubscriptionCode() {
+        return subscriptionCode;
+    }
+
+    public String getSubscriptionName() {
+        return subscriptionName;
+    }
+
+    public java.time.Instant getTrialEndsAt() {
+        return trialEndsAt;
+    }
+
+    public boolean isDataModuleEnabled() {
+        return dataModuleEnabled;
     }
 
     @Override

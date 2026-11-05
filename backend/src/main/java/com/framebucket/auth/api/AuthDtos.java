@@ -25,12 +25,27 @@ public final class AuthDtos {
     ) {
     }
 
+    public record VerifyEmailRequest(
+            @NotBlank @Size(max = 128) String token
+    ) {
+    }
+
+    public record ResendVerificationRequest(
+            @NotBlank @Email @Size(max = 320) String email
+    ) {
+    }
+
     public record UserResponse(
             UUID id,
             String fullName,
             String studioName,
             String email,
-            Instant createdAt
+            Instant createdAt,
+            UUID subscriptionId,
+            String subscriptionCode,
+            String subscriptionName,
+            Instant trialEndsAt,
+            boolean dataModuleEnabled
     ) {
     }
 }

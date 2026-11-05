@@ -11,6 +11,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -35,8 +36,14 @@ public class PhotographerUser {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    @Column(name = "trial_ends_at")
+    private Instant trialEndsAt;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "subscription_id")
@@ -52,6 +59,7 @@ public class PhotographerUser {
         this.email = email.trim().toLowerCase(Locale.ROOT);
         this.passwordHash = passwordHash;
         this.active = true;
+        this.emailVerified = false;
     }
 
     @PrePersist
@@ -89,11 +97,31 @@ public class PhotographerUser {
         return active;
     }
 
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+
+    public void verifyEmail() {
+        this.emailVerified = true;
+    }
+
+    public void startFreeTrial(SubscriptionPlan plan) {
+        if (plan.getTrialDays() <= 0) {
+            throw new IllegalArgumentException("The selected subscription is not a trial plan.");
+        }
+        this.subscription = plan;
+        this.trialEndsAt = Instant.now().plus(Duration.ofDays(plan.getTrialDays()));
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
 
     public SubscriptionPlan getSubscription() {
         return subscription;
+    }
+
+    public Instant getTrialEndsAt() {
+        return trialEndsAt;
     }
 }

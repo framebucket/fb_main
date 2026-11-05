@@ -2,7 +2,9 @@ package com.framebucket.auth.api;
 
 import com.framebucket.auth.api.AuthDtos.LoginRequest;
 import com.framebucket.auth.api.AuthDtos.RegisterRequest;
+import com.framebucket.auth.api.AuthDtos.ResendVerificationRequest;
 import com.framebucket.auth.api.AuthDtos.UserResponse;
+import com.framebucket.auth.api.AuthDtos.VerifyEmailRequest;
 import com.framebucket.auth.model.PhotographerPrincipal;
 import com.framebucket.auth.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -63,6 +65,18 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
     }
 
+    @PostMapping("/verify-email")
+    public Map<String, String> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        authService.verifyEmail(request.token());
+        return Map.of("message", "Your email has been verified. You can now sign in.");
+    }
+
+    @PostMapping("/resend-verification")
+    public Map<String, String> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        authService.resendVerification(request.email());
+        return Map.of("message", "If this account needs verification, a new link has been sent.");
+    }
+
     @PostMapping("/login")
     public UserResponse login(
             @Valid @RequestBody LoginRequest request,
@@ -78,7 +92,15 @@ public class AuthController {
                     )
             );
         } catch (AuthenticationException exception) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password.");
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Please enter correct password or Password authentication failed"
+            );
+        }
+
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof PhotographerPrincipal photographer && !photographer.isEmailVerified()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Please verify your email before signing in.");
         }
 
         // Discard any pre-login session before storing the authenticated context.
@@ -95,7 +117,6 @@ public class AuthController {
         contextHolderStrategy.setContext(context);
         securityContextRepository.saveContext(context, httpRequest, httpResponse);
 
-        Object principal = authentication.getPrincipal();
         if (!(principal instanceof PhotographerPrincipal photographer)) {
             contextHolderStrategy.clearContext();
             throw new AuthenticationServiceException("Unexpected authenticated principal.");
