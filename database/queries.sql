@@ -26,7 +26,7 @@ INSERT INTO fb_user
      subscription_id, trial_ends_at, created_at)
 VALUES
     (:id, :full_name, :studio_name, LOWER(:email), :password_hash, TRUE, FALSE,
-     (SELECT id FROM fb_subscription WHERE plan_code = 'FREE_TRIAL' AND active = TRUE),
+     (SELECT id FROM fb_user_subscription WHERE plan_code = 'FREE_TRIAL' AND active = TRUE),
      CURRENT_TIMESTAMP + INTERVAL '7 days', CURRENT_TIMESTAMP);
 
 -- Return the signed-in photographer's safe profile (no password hash).
@@ -43,14 +43,14 @@ WHERE id = :id;
 -- List plans available for new subscriptions.
 SELECT id, plan_code, plan_name, description, price_amount, currency_code, billing_cycle,
        data_module_enabled, raw_photo_selection, max_storage_gb
-FROM fb_subscription
+FROM fb_user_subscription
 WHERE active = TRUE
 ORDER BY price_amount, plan_name;
 
 -- Assign an active plan to an existing photographer.
 UPDATE fb_user AS photographer
 SET subscription_id = plan.id
-FROM fb_subscription AS plan
+FROM fb_user_subscription AS plan
 WHERE photographer.id = :user_id
   AND plan.id = :subscription_id
   AND plan.active = TRUE;

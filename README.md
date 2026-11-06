@@ -6,12 +6,14 @@ This workspace contains a Spring Boot backend and a React frontend for the photo
 
 - Public home page, photographer registration and login.
 - Photographer email verification with a local console-link mode and configurable SMTP delivery.
+- Required E.164 mobile numbers, local console OTP verification, and password confirmation on registration.
 - FrameBucket logo and navy/coral brand styling from `frontend/public/framebucket-logo.png`.
 - PostgreSQL-backed Bronze, Silver, Gold and Platinum pricing with a seven-day free-trial assignment.
 - Pricing and checkout-preview pages with annual discount and GST breakdown.
 - Session-based authentication with an HTTP-only session cookie and CSRF protection.
 - Welcome page with Customer module and Data module tabs.
-- PostgreSQL schema migrations and example SQL queries. `fb_user` references an optional `fb_subscription` plan.
+- PostgreSQL schema migrations and example SQL queries. Photographer account, subscription and verification Java code is grouped under `com.framebucket.user`; shared security configuration stays under `com.framebucket.config`.
+- The photographer and subscription schema uses `fb_user`, `fb_user_subscription`, `fb_user_email` and `fb_user_mobile` tables.
 - Local Vite proxy from the React development server to Spring Boot.
 
 The Customer and Data tabs are starting points only. Their business workflows, photo storage and processing are not implemented in this user-module starter. The payment page is a preview and does not collect payment or activate a paid plan.
@@ -62,13 +64,17 @@ To call a different backend URL, copy frontend/.env.example to frontend/.env.loc
 - POST /api/auth/register — creates a photographer account.
 - POST /api/auth/verify-email — consumes a verification token.
 - POST /api/auth/resend-verification — sends a new link for an unverified account.
+- POST /api/auth/verify-mobile — verifies a six-digit mobile code.
+- POST /api/auth/resend-mobile-code — sends a replacement mobile code when needed.
 - POST /api/auth/login — authenticates and creates a server-side session.
 - GET /api/auth/me — returns the signed-in photographer profile.
 - POST /api/auth/logout — ends the session.
 
-Registration fields: fullName, studioName (optional), email and password (minimum 12 characters). The API normalizes email addresses to lowercase and stores only a BCrypt password hash.
+Registration fields: fullName, studioName (optional), email, mobileNumber in E.164 format (for example `+919876543210`), password and confirmPassword (both minimum 12 characters). The API normalizes email addresses to lowercase, compares the password confirmation, and stores only a BCrypt password hash.
 
-New registrations must verify their email before signing in. Verification links expire after 24 hours, and only a SHA-256 hash of each token is stored. In local development, the default `APP_EMAIL_MODE=console` writes the verification link to the backend log; open that link in a browser and select **Confirm my email**. The sign-in page also has a resend link.
+New registrations must verify both email and mobile before signing in. Email verification links expire after 24 hours, and only a SHA-256 hash of each token is stored. In local development, the default `APP_EMAIL_MODE=console` writes the email verification link to the backend log; open that link in a browser and select **Confirm my email**. The sign-in page also has a resend link.
+
+The default `APP_SMS_MODE=console` writes the six-digit mobile code to the backend log for local development. Codes expire after 10 minutes and allow up to five attempts. The email verification page asks for this code after confirming the email; it can also be resent there or from sign-in if the link was verified in another session. Set `OTP_HMAC_SECRET` to a long random secret outside local development. A real SMS provider adapter must be configured before sending codes to customers in a deployed environment.
 
 To send real email, configure a reachable SMTP provider before starting the backend:
 

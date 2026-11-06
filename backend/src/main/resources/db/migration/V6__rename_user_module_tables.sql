@@ -1,0 +1,8 @@
+ALTER TABLE fb_subscription RENAME TO fb_user_subscription;
+ALTER INDEX ux_fb_subscription_plan_code RENAME TO ux_fb_user_subscription_plan_code;
+
+ALTER TABLE fb_email_verification_token RENAME TO fb_user_email;
+ALTER INDEX ix_fb_email_verification_user_id RENAME TO ix_fb_user_email_user_id;
+
+ALTER TABLE fb_mobile_verification_code RENAME TO fb_user_mobile;
+ALTER INDEX ix_fb_mobile_verification_user_id RENAME TO ix_fb_user_mobile_user_id;

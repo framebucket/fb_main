@@ -56,7 +56,7 @@ export default function App() {
     return (
       <RegisterPage
         navigate={navigate}
-        onRegistered={(email) => setNotice(`Account created for ${email}. Verify your email before signing in.`)}
+        onRegistered={(email) => setNotice(`Account created for ${email}. Verify your email and mobile number before signing in. In local mode, the mobile code appears in the backend console.`)}
       />
     );
   }
@@ -391,7 +391,7 @@ function PaymentPage({ navigate }) {
 }
 
 function RegisterPage({ navigate, onRegistered }) {
-  const [form, setForm] = useState({ fullName: '', studioName: '', email: '', password: '' });
+  const [form, setForm] = useState({ fullName: '', studioName: '', email: '', mobileNumber: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -402,6 +402,10 @@ function RegisterPage({ navigate, onRegistered }) {
   async function submit(event) {
     event.preventDefault();
     setError('');
+    if (form.password !== form.confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
     setBusy(true);
     try {
       await api.register(form);
@@ -420,12 +424,14 @@ function RegisterPage({ navigate, onRegistered }) {
         <label>Full name<input name="fullName" value={form.fullName} onChange={update} autoComplete="name" required maxLength="120" placeholder="Your name" /></label>
         <label>Studio name <span className="optional-label">OPTIONAL</span><input name="studioName" value={form.studioName} onChange={update} maxLength="160" placeholder="The name clients know" /></label>
         <label>Email address<input name="email" type="email" value={form.email} onChange={update} autoComplete="email" required maxLength="320" placeholder="you@yourstudio.com" /></label>
+        <label>Mobile number<input name="mobileNumber" type="tel" value={form.mobileNumber} onChange={update} autoComplete="tel" required maxLength="16" pattern="\+[1-9][0-9]{7,14}" placeholder="+919876543210" aria-describedby="mobile-format-hint" /><span id="mobile-format-hint" className="field-hint">Include country code, for example +919876543210.</span></label>
         <label>Password<input name="password" type="password" value={form.password} onChange={update} autoComplete="new-password" required minLength="12" maxLength="64" placeholder="At least 12 characters" /></label>
+        <label>Confirm password<input name="confirmPassword" type="password" value={form.confirmPassword} onChange={update} autoComplete="new-password" required minLength="12" maxLength="64" placeholder="Enter the same password again" /></label>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button button-dark button-full" type="submit" disabled={busy}>
           {busy ? 'Creating your account…' : 'Create photographer account'} <span aria-hidden="true">↗</span>
         </button>
-        <p className="form-footnote">Your password is stored as a one-way hash and is never shown in your profile.</p>
+        <p className="form-footnote">We’ll send a verification link to your email and a one-time code to your mobile. Your password is stored as a one-way hash.</p>
       </form>
       <p className="auth-switch">Already registered? <button onClick={() => navigate('/login')}>Log in</button></p>
     </AuthLayout>
@@ -439,6 +445,10 @@ function LoginPage({ navigate, notice, clearNotice, onLogin }) {
   const [busy, setBusy] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendNotice, setResendNotice] = useState('');
+  const [needsMobileVerification, setNeedsMobileVerification] = useState(false);
+  const [mobileCode, setMobileCode] = useState('');
+  const [mobileBusy, setMobileBusy] = useState(false);
+  const [mobileNotice, setMobileNotice] = useState('');
 
   async function resendVerification() {
     setError('');
@@ -470,8 +480,46 @@ function LoginPage({ navigate, notice, clearNotice, onLogin }) {
       clearNotice();
     } catch (requestError) {
       setError(requestError.message);
+      if (/verify your mobile/i.test(requestError.message)) {
+        setNeedsMobileVerification(true);
+      }
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function verifyMobile(event) {
+    event.preventDefault();
+    setError('');
+    setMobileNotice('');
+    setMobileBusy(true);
+    try {
+      const response = await api.verifyMobile(email.trim(), mobileCode);
+      setNeedsMobileVerification(false);
+      setMobileCode('');
+      setMobileNotice(response.message);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setMobileBusy(false);
+    }
+  }
+
+  async function resendMobileCode() {
+    setError('');
+    setMobileNotice('');
+    if (!email.trim()) {
+      setError('Enter your email address above first.');
+      return;
+    }
+    setMobileBusy(true);
+    try {
+      const response = await api.resendMobileCode(email.trim());
+      setMobileNotice(response.message);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setMobileBusy(false);
     }
   }
 
@@ -493,6 +541,17 @@ function LoginPage({ navigate, notice, clearNotice, onLogin }) {
         </button>
       </div>
       {resendNotice && <p className="form-success" role="status">{resendNotice}</p>}
+      {needsMobileVerification && (
+        <form className="auth-form mobile-verification-form" onSubmit={verifyMobile}>
+          <p className="verification-prompt">Enter the 6-digit code sent to your mobile number. In local mode, find it in the backend console.</p>
+          <label>Mobile verification code<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength="6" value={mobileCode} onChange={(event) => setMobileCode(event.target.value.replace(/\D/g, '').slice(0, 6))} required placeholder="000000" /></label>
+          <button className="button button-dark button-full" type="submit" disabled={mobileBusy || mobileCode.length !== 6}>
+            {mobileBusy ? 'Verifying…' : 'Verify mobile number'} <span aria-hidden="true">↗</span>
+          </button>
+          <div className="verification-help"><span>Code expired or missing?</span><button type="button" onClick={resendMobileCode} disabled={mobileBusy}>{mobileBusy ? 'Sending…' : 'Send a new code'}</button></div>
+        </form>
+      )}
+      {mobileNotice && <p className="form-success" role="status">{mobileNotice}</p>}
       <p className="auth-switch">New to FrameBucket? <button onClick={() => navigate('/register')}>Create an account</button></p>
     </AuthLayout>
   );
@@ -502,13 +561,19 @@ function VerifyEmailPage({ navigate }) {
   const token = new URLSearchParams(window.location.search).get('token') || '';
   const [busy, setBusy] = useState(false);
   const [verified, setVerified] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState('');
+  const [mobileCode, setMobileCode] = useState('');
+  const [mobileVerified, setMobileVerified] = useState(false);
+  const [mobileBusy, setMobileBusy] = useState(false);
+  const [mobileNotice, setMobileNotice] = useState('');
   const [error, setError] = useState('');
 
   async function verify() {
     setError('');
     setBusy(true);
     try {
-      await api.verifyEmail(token);
+      const response = await api.verifyEmail(token);
+      setVerifiedEmail(response.email);
       setVerified(true);
     } catch (requestError) {
       setError(requestError.message);
@@ -517,20 +582,62 @@ function VerifyEmailPage({ navigate }) {
     }
   }
 
+  async function verifyMobile(event) {
+    event.preventDefault();
+    setError('');
+    setMobileNotice('');
+    setMobileBusy(true);
+    try {
+      const response = await api.verifyMobile(verifiedEmail, mobileCode);
+      setMobileVerified(true);
+      setMobileNotice(response.message);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setMobileBusy(false);
+    }
+  }
+
+  async function resendMobileCode() {
+    setError('');
+    setMobileNotice('');
+    setMobileBusy(true);
+    try {
+      const response = await api.resendMobileCode(verifiedEmail);
+      setMobileNotice(response.message);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setMobileBusy(false);
+    }
+  }
+
   return (
     <AuthLayout
       eyebrow="EMAIL VERIFICATION"
-      title={verified ? <>Your email is<br /><em>confirmed.</em></> : <>One final step<br /><em>to open your studio.</em></>}
+      title={mobileVerified ? <>Your account is<br /><em>confirmed.</em></> : verified ? <>Verify your<br /><em>mobile number.</em></> : <>One final step<br /><em>to open your studio.</em></>}
       subtitle={verified
-        ? 'Your FrameBucket account is ready. Sign in to continue.'
+        ? (mobileVerified ? 'Your FrameBucket account is ready. Sign in to continue.' : 'Your email is confirmed. Enter the one-time code sent to your mobile number to finish activating the account.')
         : 'Confirm your email address to activate your photographer account.'}
     >
       {error && <p className="form-error" role="alert">{error}</p>}
       {!token && <p className="form-error" role="alert">This verification link is missing its token. Request a new link from the sign-in page.</p>}
       {verified ? (
-        <button className="button button-dark button-full" onClick={() => navigate('/login')}>
-          Go to sign in <span aria-hidden="true">↗</span>
-        </button>
+        mobileVerified ? (
+          <button className="button button-dark button-full" onClick={() => navigate('/login')}>
+            Go to sign in <span aria-hidden="true">↗</span>
+          </button>
+        ) : (
+          <form className="auth-form" onSubmit={verifyMobile}>
+            <p className="verification-prompt">Enter the 6-digit code sent to your mobile number. In local mode, find it in the backend console.</p>
+            <label>Mobile verification code<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength="6" value={mobileCode} onChange={(event) => setMobileCode(event.target.value.replace(/\D/g, '').slice(0, 6))} required placeholder="000000" /></label>
+            <button className="button button-dark button-full" type="submit" disabled={mobileBusy || mobileCode.length !== 6}>
+              {mobileBusy ? 'Verifying…' : 'Verify mobile number'} <span aria-hidden="true">↗</span>
+            </button>
+            <div className="verification-help"><span>Code expired or missing?</span><button type="button" onClick={resendMobileCode} disabled={mobileBusy}>{mobileBusy ? 'Sending…' : 'Send a new code'}</button></div>
+            {mobileNotice && <p className="form-success" role="status">{mobileNotice}</p>}
+          </form>
+        )
       ) : token ? (
         <button className="button button-dark button-full" onClick={verify} disabled={busy}>
           {busy ? 'Confirming email…' : 'Confirm my email'} <span aria-hidden="true">↗</span>
