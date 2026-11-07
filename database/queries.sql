@@ -3,6 +3,9 @@
 -- backend/src/main/resources/db/migration/V2__rename_user_and_add_subscriptions.sql
 -- backend/src/main/resources/db/migration/V3__add_email_verification.sql
 -- backend/src/main/resources/db/migration/V4__seed_subscription_plans_and_trial.sql
+-- backend/src/main/resources/db/migration/V7__create_customers.sql
+-- backend/src/main/resources/db/migration/V8__create_customer_login_otp.sql
+-- backend/src/main/resources/db/migration/V9__normalize_indian_mobile_numbers.sql
 
 -- Find an account for login. Compare case-insensitively and return the hash
 -- only to the backend authentication layer; never return password_hash to React.
@@ -54,3 +57,29 @@ FROM fb_user_subscription AS plan
 WHERE photographer.id = :user_id
   AND plan.id = :subscription_id
   AND plan.active = TRUE;
+
+-- The API inserts customer rows using the authenticated photographer ID.
+-- Events and revenue are initialized to zero and will be updated by the Event module.
+INSERT INTO fb_customer
+    (id, photographer_id, name, email, mobile_number, date_of_birth, address,
+     events_booked, total_revenue_generated, created_at)
+VALUES
+    (:id, :photographer_id, :name, LOWER(:email), :mobile_number, :date_of_birth, :address,
+     0, 0.00, CURRENT_TIMESTAMP);
+
+-- List only the current photographer's customer records.
+SELECT id, name, email, mobile_number, date_of_birth, address,
+       events_booked, total_revenue_generated, created_at
+FROM fb_customer
+WHERE photographer_id = :photographer_id
+ORDER BY created_at DESC;
+
+-- Customer sign-in codes are stored as keyed hashes and expire after 10 minutes.
+-- The API sends the same raw code to each registered email for this mobile number and to the mobile sender.
+SELECT id, mobile_number, code_hash, expires_at, consumed_at, attempt_count, created_at
+FROM fb_customer_login_otp
+WHERE mobile_number = :mobile_number
+  AND consumed_at IS NULL
+  AND expires_at > CURRENT_TIMESTAMP
+ORDER BY created_at DESC
+LIMIT 1;

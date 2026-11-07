@@ -81,7 +81,7 @@ public class AuthController {
 
     @PostMapping("/verify-mobile")
     public Map<String, String> verifyMobile(@Valid @RequestBody VerifyMobileRequest request) {
-        if (!authService.verifyMobile(request.email(), request.code())) {
+        if (!authService.verifyMobile(request.identifier(), request.code())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "The mobile verification code is invalid or expired. Request a new code and try again."
@@ -92,7 +92,7 @@ public class AuthController {
 
     @PostMapping("/resend-mobile-code")
     public Map<String, String> resendMobileCode(@Valid @RequestBody ResendMobileCodeRequest request) {
-        authService.resendMobileCode(request.email());
+        authService.resendMobileCode(request.identifier());
         return Map.of("message", "If this account needs mobile verification, a new code has been sent.");
     }
 
@@ -106,7 +106,7 @@ public class AuthController {
         try {
             authentication = authenticationManager.authenticate(
                     UsernamePasswordAuthenticationToken.unauthenticated(
-                            request.email().trim(),
+                            request.username().trim(),
                             request.password()
                     )
             );

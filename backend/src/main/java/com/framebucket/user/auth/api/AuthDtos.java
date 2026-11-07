@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -16,14 +17,14 @@ public final class AuthDtos {
             @NotBlank @Size(max = 120) String fullName,
             @Size(max = 160) String studioName,
             @NotBlank @Email @Size(max = 320) String email,
-            @NotBlank @Pattern(regexp = "^\\+[1-9][0-9]{7,14}$") @Size(max = 16) String mobileNumber,
+            @NotBlank @Pattern(regexp = "^(?:[0-9]{10}|\\+91[0-9]{10})$") @Size(max = 13) String mobileNumber,
             @NotBlank @Size(min = 12, max = 64) String password,
             @NotBlank @Size(min = 12, max = 64) String confirmPassword
     ) {
     }
 
     public record LoginRequest(
-            @NotBlank @Email @Size(max = 320) String email,
+            @NotBlank @Size(max = 320) @JsonAlias("email") String username,
             @NotBlank String password
     ) {
     }
@@ -39,13 +40,13 @@ public final class AuthDtos {
     }
 
     public record VerifyMobileRequest(
-            @NotBlank @Email @Size(max = 320) String email,
+            @NotBlank @Size(max = 320) String identifier,
             @NotBlank @Pattern(regexp = "^[0-9]{6}$") String code
     ) {
     }
 
     public record ResendMobileCodeRequest(
-            @NotBlank @Email @Size(max = 320) String email
+            @NotBlank @Size(max = 320) String identifier
     ) {
     }
 

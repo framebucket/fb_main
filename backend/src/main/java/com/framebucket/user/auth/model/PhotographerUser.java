@@ -1,6 +1,7 @@
 package com.framebucket.user.auth.model;
 
 import com.framebucket.user.subscription.model.SubscriptionPlan;
+import com.framebucket.common.phone.IndianMobileNumber;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -27,6 +28,9 @@ public class PhotographerUser {
     @Column(name = "studio_name", length = 160)
     private String studioName;
 
+    @Column(name = "sub_id", length = 512)
+    private String subId;
+
     @Column(nullable = false, length = 320)
     private String email;
 
@@ -48,6 +52,12 @@ public class PhotographerUser {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "customer_sequence", nullable = false)
+    private int customerSequence;
+
+    @Column(name = "event_sequence", nullable = false)
+    private int eventSequence;
+
     @Column(name = "trial_ends_at")
     private Instant trialEndsAt;
 
@@ -63,7 +73,7 @@ public class PhotographerUser {
         this.fullName = fullName.trim();
         this.studioName = normalizeOptional(studioName);
         this.email = email.trim().toLowerCase(Locale.ROOT);
-        this.mobileNumber = mobileNumber.trim();
+        this.mobileNumber = mobileNumber == null ? null : IndianMobileNumber.normalize(mobileNumber);
         this.passwordHash = passwordHash;
         this.active = true;
         this.emailVerified = false;
@@ -85,12 +95,38 @@ public class PhotographerUser {
         return id;
     }
 
+    public int allocateCustomerSequence() {
+        if (customerSequence > 999) {
+            throw new IllegalStateException("This photographer has reached the customer ID limit.");
+        }
+        return customerSequence++;
+    }
+
+    public int allocateEventSequence() {
+        if (eventSequence > 99999) {
+            throw new IllegalStateException("This photographer has reached the event ID limit.");
+        }
+        return eventSequence++;
+    }
+
+    public int getEventSequence() {
+        return eventSequence;
+    }
+
     public String getFullName() {
         return fullName;
     }
 
     public String getStudioName() {
         return studioName;
+    }
+
+    public String getSubId() {
+        return subId;
+    }
+
+    public void setSubId(String subId) {
+        this.subId = subId;
     }
 
     public String getEmail() {

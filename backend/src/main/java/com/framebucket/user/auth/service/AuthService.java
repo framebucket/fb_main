@@ -2,6 +2,7 @@ package com.framebucket.user.auth.service;
 
 import com.framebucket.user.auth.api.AuthDtos.RegisterRequest;
 import com.framebucket.user.auth.api.AuthDtos.UserResponse;
+import com.framebucket.common.phone.IndianMobileNumber;
 import com.framebucket.user.auth.model.PhotographerPrincipal;
 import com.framebucket.user.auth.model.PhotographerUser;
 import com.framebucket.user.auth.repository.PhotographerUserRepository;
@@ -15,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Optional;
 
 @Service
 public class AuthService {
@@ -23,19 +25,22 @@ public class AuthService {
     private final EmailVerificationService emailVerificationService;
     private final MobileVerificationService mobileVerificationService;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final SubIdService subIdService;
 
     public AuthService(
             PhotographerUserRepository userRepository,
             PasswordEncoder passwordEncoder,
             EmailVerificationService emailVerificationService,
             MobileVerificationService mobileVerificationService,
-            SubscriptionPlanRepository subscriptionPlanRepository
+            SubscriptionPlanRepository subscriptionPlanRepository,
+            SubIdService subIdService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.emailVerificationService = emailVerificationService;
         this.mobileVerificationService = mobileVerificationService;
         this.subscriptionPlanRepository = subscriptionPlanRepository;
+        this.subIdService = subIdService;
     }
 
     @Transactional
@@ -55,6 +60,11 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email already exists.");
         }
 
+        String mobileNumber = IndianMobileNumber.normalize(request.mobileNumber());
+        if (userRepository.existsByMobileNumber(mobileNumber)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this mobile number already exists.");
+        }
+
         SubscriptionPlan trialPlan = subscriptionPlanRepository.findByPlanCodeAndActiveTrue("FREE_TRIAL")
                 .orElseThrow(() -> new IllegalStateException("The free trial subscription has not been configured."));
 
@@ -62,9 +72,10 @@ public class AuthService {
                 request.fullName(),
                 request.studioName(),
                 email,
-                request.mobileNumber(),
+                mobileNumber,
                 passwordEncoder.encode(request.password())
         );
+        subIdService.initializeSubId(user);
         user.startFreeTrial(trialPlan);
 
         user = userRepository.save(user);
@@ -79,19 +90,26 @@ public class AuthService {
     }
 
     @Transactional
-    public boolean verifyMobile(String emailAddress, String code) {
-        String email = emailAddress.trim().toLowerCase(Locale.ROOT);
-        return userRepository.findByEmailIgnoreCase(email)
+    public boolean verifyMobile(String identifier, String code) {
+        return findByLoginIdentifier(identifier)
                 .map(user -> mobileVerificationService.verifyCode(user, code))
                 .orElse(false);
     }
 
     @Transactional
-    public void resendMobileCode(String emailAddress) {
-        String email = emailAddress.trim().toLowerCase(Locale.ROOT);
-        userRepository.findByEmailIgnoreCase(email)
+    public void resendMobileCode(String identifier) {
+        findByLoginIdentifier(identifier)
                 .filter(user -> !user.isMobileVerified())
                 .ifPresent(mobileVerificationService::sendCode);
+    }
+
+    private Optional<PhotographerUser> findByLoginIdentifier(String identifier) {
+        String value = identifier.trim();
+        if (IndianMobileNumber.isValidInput(value)) {
+            var matches = userRepository.findAllByMobileNumber(IndianMobileNumber.normalize(value));
+            return matches.size() == 1 ? Optional.of(matches.get(0)) : Optional.empty();
+        }
+        return userRepository.findByEmailIgnoreCase(value.toLowerCase(Locale.ROOT));
     }
 
     @Transactional

@@ -77,8 +77,15 @@ public class SecurityConfig {
                                 "/api/auth/verify-email",
                                 "/api/auth/resend-verification",
                                 "/api/auth/verify-mobile",
-                                "/api/auth/resend-mobile-code"
+                                "/api/auth/resend-mobile-code",
+                                "/api/customer-auth/request-code",
+                                "/api/customer-auth/verify-code"
                         ).permitAll()
+                        .requestMatchers("/api/public/**").permitAll()
+                        .requestMatchers("/api/customers/**", "/api/events", "/api/events/**", "/api/auth/me").hasRole("PHOTOGRAPHER")
+                        .requestMatchers("/api/enquiries", "/api/enquiries/**").hasRole("PHOTOGRAPHER")
+                        .requestMatchers("/api/dashboard/**").hasRole("PHOTOGRAPHER")
+                        .requestMatchers("/api/customer-auth/me", "/api/customer-portal/**").hasRole("CUSTOMER")
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()
                 )
