@@ -1,6 +1,8 @@
 package com.framebucket.event.model;
 
 import com.framebucket.customer.model.Customer;
+import com.framebucket.team.model.Freelancer;
+import com.framebucket.team.model.TeamMember;
 import com.framebucket.user.auth.model.PhotographerUser;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,6 +16,7 @@ import jakarta.persistence.UniqueConstraint;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.UUID;
 
 @Entity
@@ -38,6 +41,9 @@ public class EventBooking {
     @Column(name = "event_date", nullable = false)
     private LocalDate eventDate;
 
+    @Column(name = "event_time")
+    private LocalTime eventTime;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "event_type_id", nullable = false)
     private EventType eventType;
@@ -48,6 +54,29 @@ public class EventBooking {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_member_assignee_id")
+    private TeamMember teamMemberAssignee;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "freelancer_assignee_id")
+    private Freelancer freelancerAssignee;
+
+    @Column(name = "location_name", length = 240)
+    private String locationName;
+
+    @Column(name = "location_map_url", length = 2048)
+    private String locationMapUrl;
+
+    @Column(name = "location_landmark", length = 240)
+    private String locationLandmark;
+
+    @Column(name = "location_notes", length = 2000)
+    private String locationNotes;
+
+    @Column(name = "location_updated_at")
+    private Instant locationUpdatedAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -95,6 +124,8 @@ public class EventBooking {
         return eventDate;
     }
 
+    public LocalTime getEventTime() { return eventTime; }
+
     public EventType getEventType() {
         return eventType;
     }
@@ -105,6 +136,34 @@ public class EventBooking {
 
     public Customer getCustomer() {
         return customer;
+    }
+
+    public TeamMember getTeamMemberAssignee() { return teamMemberAssignee; }
+
+    public Freelancer getFreelancerAssignee() { return freelancerAssignee; }
+
+    public String getLocationName() { return locationName; }
+
+    public String getLocationMapUrl() { return locationMapUrl; }
+
+    public String getLocationLandmark() { return locationLandmark; }
+
+    public String getLocationNotes() { return locationNotes; }
+
+    public Instant getLocationUpdatedAt() { return locationUpdatedAt; }
+
+    public void assign(TeamMember teamMember, Freelancer freelancer) {
+        this.teamMemberAssignee = teamMember;
+        this.freelancerAssignee = freelancer;
+    }
+
+    public void updateLocation(String name, String mapUrl, String landmark, String notes, LocalTime time, Instant updatedAt) {
+        this.locationName = name;
+        this.locationMapUrl = mapUrl;
+        this.locationLandmark = landmark;
+        this.locationNotes = notes;
+        this.eventTime = time;
+        this.locationUpdatedAt = updatedAt;
     }
 
     public Instant getCreatedAt() {

@@ -16,6 +16,12 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, UUID
 
     List<EventBooking> findAllByCustomer_IdInOrderByEventDateDesc(Collection<UUID> customerIds);
 
+    java.util.Optional<EventBooking> findByIdAndPhotographer_Id(UUID eventId, UUID photographerId);
+
+    java.util.Optional<EventBooking> findByIdAndCustomer_IdIn(UUID eventId, Collection<UUID> customerIds);
+
+    List<EventBooking> findAllByCustomer_IdAndPhotographer_Id(UUID customerId, UUID photographerId);
+
     List<EventBooking> findAllByPhotographer_IdOrderByEventDateAsc(UUID photographerId);
 
     boolean existsByPhotographer_IdAndEventDate(UUID photographerId, LocalDate eventDate);
@@ -46,4 +52,5 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, UUID
 
         Instant getCreatedAt();
     }
+
 }

@@ -1,6 +1,7 @@
 package com.framebucket.dashboard.service;
 
 import com.framebucket.customer.repository.CustomerRepository;
+import com.framebucket.common.money.PriceAmountParser;
 import com.framebucket.dashboard.api.DashboardDtos.ActivitySummary;
 import com.framebucket.dashboard.api.DashboardDtos.DashboardSummaryResponse;
 import com.framebucket.dashboard.api.DashboardDtos.RevenueByEventType;
@@ -22,13 +23,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.regex.Pattern;
 
 @Service
 public class DashboardService {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Kolkata");
     private static final DateTimeFormatter MONTH_LABEL = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH);
-    private static final Pattern PRICE_VALUE = Pattern.compile("^\\d+(?:\\.\\d{1,2})?$");
     private static final BigDecimal ZERO_MONEY = new BigDecimal("0.00");
 
     private final CustomerRepository customerRepository;
@@ -72,7 +71,7 @@ public class DashboardService {
         );
         Map<String, BigDecimal> revenueByType = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         for (EventRevenueRow row : revenueRows) {
-            BigDecimal price = parsePrice(row.getPrice());
+            BigDecimal price = PriceAmountParser.parse(row.getPrice());
             if (price == null || price.signum() <= 0) {
                 continue;
             }
@@ -82,7 +81,7 @@ public class DashboardService {
         BigDecimal revenueThisMonth = revenueRows.stream()
                 .filter(row -> !row.getCreatedAt().isBefore(monthStartInstant)
                         && row.getCreatedAt().isBefore(nextMonthStartInstant))
-                .map(row -> parsePrice(row.getPrice()))
+                .map(row -> PriceAmountParser.parse(row.getPrice()))
                 .filter(price -> price != null && price.signum() > 0)
                 .reduce(ZERO_MONEY, BigDecimal::add)
                 .setScale(2, RoundingMode.HALF_UP);
@@ -107,23 +106,4 @@ public class DashboardService {
         );
     }
 
-    private static BigDecimal parsePrice(String submittedPrice) {
-        if (submittedPrice == null || submittedPrice.isBlank()) {
-            return null;
-        }
-        String normalized = submittedPrice.trim()
-                .replaceAll("(?i)^(?:INR|RS\\.?|₹)\\s*", "")
-                .replaceAll("(?i)\\s*(?:INR|RS\\.?)$", "")
-                .replace(",", "")
-                .replace("/-", "")
-                .trim();
-        if (!PRICE_VALUE.matcher(normalized).matches()) {
-            return null;
-        }
-        try {
-            return new BigDecimal(normalized).setScale(2, RoundingMode.HALF_UP);
-        } catch (NumberFormatException exception) {
-            return null;
-        }
-    }
 }

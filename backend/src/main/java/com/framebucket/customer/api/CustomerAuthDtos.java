@@ -26,10 +26,18 @@ public final class CustomerAuthDtos {
     }
 
     public record CustomerEventResponse(
+            java.util.UUID eventId,
             String eventName,
             String photographerName,
             java.time.LocalDate eventDate,
-            String status
+            java.time.LocalTime eventTime,
+            String status,
+            String assigneeName,
+            String locationName,
+            String locationMapUrl,
+            String locationLandmark,
+            String locationNotes,
+            java.time.Instant locationUpdatedAt
     ) {
     }
 }

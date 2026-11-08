@@ -1,28 +1,45 @@
 package com.framebucket.event.service;
 
 import com.framebucket.customer.model.Customer;
+import com.framebucket.customer.model.CustomerPrincipal;
+import com.framebucket.customer.api.CustomerAuthDtos.CustomerEventResponse;
 import com.framebucket.customer.repository.CustomerRepository;
 import com.framebucket.enquiry.repository.EnquiryRepository;
 import com.framebucket.event.api.EventDtos.EventCreateRequest;
 import com.framebucket.event.api.EventDtos.EventIdPreview;
 import com.framebucket.event.api.EventDtos.EventResponse;
 import com.framebucket.event.api.EventDtos.EventTypeResponse;
+import com.framebucket.event.api.EventDtos.AssigneeUpdateRequest;
+import com.framebucket.event.api.EventDtos.CustomerLocationUpdateRequest;
 import com.framebucket.event.model.EventBooking;
 import com.framebucket.event.model.EventType;
 import com.framebucket.event.repository.EventBookingRepository;
 import com.framebucket.event.repository.EventTypeRepository;
+import com.framebucket.event.notification.EventAssignmentNotice;
+import com.framebucket.team.model.Freelancer;
+import com.framebucket.team.model.MemberType;
+import com.framebucket.team.model.TeamMember;
+import com.framebucket.team.model.TeamMemberStatus;
+import com.framebucket.team.repository.FreelancerRepository;
+import com.framebucket.team.repository.TeamMemberRepository;
 import com.framebucket.user.auth.model.PhotographerPrincipal;
 import com.framebucket.user.auth.model.PhotographerUser;
 import com.framebucket.user.auth.repository.PhotographerUserRepository;
 import com.framebucket.user.auth.service.SubIdService;
 import org.springframework.http.HttpStatus;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -34,6 +51,9 @@ public class EventService {
     private final EnquiryRepository enquiryRepository;
     private final PhotographerUserRepository photographerRepository;
     private final SubIdService subIdService;
+    private final TeamMemberRepository teamMemberRepository;
+    private final FreelancerRepository freelancerRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public EventService(
             EventBookingRepository eventRepository,
@@ -41,7 +61,10 @@ public class EventService {
             CustomerRepository customerRepository,
             EnquiryRepository enquiryRepository,
             PhotographerUserRepository photographerRepository,
-            SubIdService subIdService
+            SubIdService subIdService,
+            TeamMemberRepository teamMemberRepository,
+            FreelancerRepository freelancerRepository,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.eventRepository = eventRepository;
         this.eventTypeRepository = eventTypeRepository;
@@ -49,6 +72,9 @@ public class EventService {
         this.enquiryRepository = enquiryRepository;
         this.photographerRepository = photographerRepository;
         this.subIdService = subIdService;
+        this.teamMemberRepository = teamMemberRepository;
+        this.freelancerRepository = freelancerRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -142,38 +168,179 @@ public class EventService {
         return toResponse(event, null);
     }
 
+    @Transactional
+    public EventResponse updateAssignee(
+            PhotographerPrincipal photographer,
+            UUID eventId,
+            AssigneeUpdateRequest request
+    ) {
+        EventBooking event = eventRepository.findByIdAndPhotographer_Id(eventId, photographer.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found."));
+
+        UUID previousAssigneeId = event.getTeamMemberAssignee() != null
+                ? event.getTeamMemberAssignee().getId()
+                : event.getFreelancerAssignee() != null ? event.getFreelancerAssignee().getId() : null;
+        MemberType previousAssigneeType = event.getTeamMemberAssignee() != null
+                ? MemberType.TEAM_MEMBER
+                : event.getFreelancerAssignee() != null ? MemberType.FREELANCER : null;
+
+        TeamMember teamMember = null;
+        Freelancer freelancer = null;
+        if (request.assigneeId() != null) {
+            if (request.assigneeType() == MemberType.TEAM_MEMBER) {
+                teamMember = teamMemberRepository.findByIdAndPhotographer_Id(request.assigneeId(), photographer.getId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Team member not found."));
+                if (teamMember.getStatus() != TeamMemberStatus.ACTIVE) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Only active team members can be assigned to an event.");
+                }
+            } else {
+                freelancer = freelancerRepository.findByIdAndPhotographer_Id(request.assigneeId(), photographer.getId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Freelancer not found."));
+                if (freelancer.getStatus() != TeamMemberStatus.ACTIVE) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Only active freelancers can be assigned to an event.");
+                }
+            }
+        }
+        event.assign(teamMember, freelancer);
+        if (request.assigneeId() != null
+                && (!request.assigneeId().equals(previousAssigneeId) || request.assigneeType() != previousAssigneeType)) {
+            eventPublisher.publishEvent(toAssignmentNotice(event, teamMember, freelancer));
+        }
+        return toResponse(event, null);
+    }
+
+    @Transactional
+    public CustomerEventResponse updateCustomerLocation(
+            CustomerPrincipal customer,
+            UUID eventId,
+            CustomerLocationUpdateRequest request
+    ) {
+        EventBooking event = eventRepository.findByIdAndCustomer_IdIn(eventId, customer.getCustomerIds())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booked event not found."));
+        String locationName = request.locationName().trim();
+        String locationMapUrl = normalizeGoogleMapsUrl(locationName, request.locationMapUrl());
+        String landmark = blankToNull(request.landmark());
+        String notes = blankToNull(request.notes());
+        event.updateLocation(locationName, locationMapUrl, landmark, notes, request.eventTime(), java.time.Instant.now());
+        return toCustomerEventResponse(event);
+    }
+
     @Transactional(readOnly = true)
-    public List<com.framebucket.customer.api.CustomerAuthDtos.CustomerEventResponse> eventsForCustomers(List<UUID> customerIds) {
+    public List<CustomerEventResponse> eventsForCustomers(List<UUID> customerIds) {
         if (customerIds.isEmpty()) {
             return List.of();
         }
         return eventRepository.findAllByCustomer_IdInOrderByEventDateDesc(customerIds)
                 .stream()
-                .map(event -> new com.framebucket.customer.api.CustomerAuthDtos.CustomerEventResponse(
-                        event.getEventType().getName(),
-                        event.getPhotographer().getStudioName() == null
-                                ? event.getPhotographer().getFullName()
-                                : event.getPhotographer().getStudioName(),
-                        event.getEventDate(),
-                        "Booked"
-                ))
+                .map(EventService::toCustomerEventResponse)
                 .toList();
     }
 
     private static EventResponse toResponse(EventBooking event, UUID enquiryId) {
         Customer customer = event.getCustomer();
+        UUID assigneeId = event.getTeamMemberAssignee() != null
+                ? event.getTeamMemberAssignee().getId()
+                : event.getFreelancerAssignee() != null ? event.getFreelancerAssignee().getId() : null;
+        MemberType assigneeType = event.getTeamMemberAssignee() != null
+                ? MemberType.TEAM_MEMBER
+                : event.getFreelancerAssignee() != null ? MemberType.FREELANCER : null;
+        String assigneeName = event.getTeamMemberAssignee() != null
+                ? event.getTeamMemberAssignee().getName()
+                : event.getFreelancerAssignee() != null ? event.getFreelancerAssignee().getName() : null;
         return new EventResponse(
                 event.getId(),
                 event.getEventCode(),
                 event.getEventDate(),
+                event.getEventTime(),
                 event.getEventType().getName(),
                 event.getPrice(),
                 customer.getId(),
                 customer.getCustomerCode(),
                 customer.getName(),
                 enquiryId,
-                event.getCreatedAt()
+                event.getCreatedAt(),
+                assigneeId,
+                assigneeType,
+                assigneeName,
+                event.getLocationName(),
+                event.getLocationMapUrl(),
+                event.getLocationLandmark(),
+                event.getLocationNotes(),
+                event.getLocationUpdatedAt()
         );
+    }
+
+    private static CustomerEventResponse toCustomerEventResponse(EventBooking event) {
+        String assigneeName = event.getTeamMemberAssignee() != null
+                ? event.getTeamMemberAssignee().getName()
+                : event.getFreelancerAssignee() != null ? event.getFreelancerAssignee().getName() : null;
+        String photographerName = event.getPhotographer().getStudioName() == null
+                ? event.getPhotographer().getFullName()
+                : event.getPhotographer().getStudioName();
+        return new CustomerEventResponse(
+                event.getId(), event.getEventType().getName(), photographerName, event.getEventDate(), event.getEventTime(), "Booked",
+                assigneeName, event.getLocationName(), event.getLocationMapUrl(), event.getLocationLandmark(),
+                event.getLocationNotes(), event.getLocationUpdatedAt()
+        );
+    }
+
+    private static EventAssignmentNotice toAssignmentNotice(EventBooking event, TeamMember teamMember, Freelancer freelancer) {
+        PhotographerUser photographer = event.getPhotographer();
+        Customer customer = event.getCustomer();
+        var assignee = teamMember != null ? teamMember : freelancer;
+        String studioName = blankToNull(photographer.getStudioName());
+        String photographerName = photographer.getFullName();
+        String eventLocation = blankToNull(event.getLocationName());
+        if (eventLocation == null) {
+            eventLocation = "To be confirmed";
+        } else if (blankToNull(event.getLocationMapUrl()) != null) {
+            eventLocation += " — " + event.getLocationMapUrl();
+        }
+        String eventTime = event.getEventTime() == null
+                ? "To be confirmed"
+                : event.getEventTime().format(DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH));
+        return new EventAssignmentNotice(
+                whatsappNumber(customer.getMobileNumber()),
+                photographerName,
+                blankToNull(photographer.getMobileNumber()) == null ? "Not provided" : photographer.getMobileNumber(),
+                studioName == null ? photographerName : studioName,
+                whatsappNumber(assignee.getMobileNumber()),
+                event.getEventType().getName(),
+                eventLocation,
+                blankToNull(event.getLocationLandmark()) == null ? "Not provided" : event.getLocationLandmark(),
+                eventTime,
+                assignee.getName()
+        );
+    }
+
+    private static String whatsappNumber(String mobileNumber) {
+        return "91" + com.framebucket.common.phone.IndianMobileNumber.normalize(mobileNumber);
+    }
+
+    private static String normalizeGoogleMapsUrl(String locationName, String submittedUrl) {
+        if (submittedUrl == null || submittedUrl.isBlank()) {
+            return "https://www.google.com/maps/search/?api=1&query="
+                    + URLEncoder.encode(locationName, StandardCharsets.UTF_8).replace("+", "%20");
+        }
+        try {
+            URI uri = URI.create(submittedUrl.trim());
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+            boolean googleMapsHost = host.equals("maps.app.goo.gl")
+                    || (host.equals("goo.gl") && uri.getPath() != null && uri.getPath().startsWith("/maps"))
+                    || host.equals("google.com") || host.equals("www.google.com") || host.equals("maps.google.com")
+                    || host.endsWith(".google.com") || host.equals("google.co.in")
+                    || host.equals("www.google.co.in") || host.equals("maps.google.co.in");
+            if (!"https".equalsIgnoreCase(uri.getScheme()) || !googleMapsHost) {
+                throw new IllegalArgumentException("Use a secure Google Maps place link.");
+            }
+            return uri.toString();
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a valid HTTPS Google Maps link, or leave it blank to create a map search link.");
+        }
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private static EventTypeResponse toTypeResponse(EventType eventType) {
