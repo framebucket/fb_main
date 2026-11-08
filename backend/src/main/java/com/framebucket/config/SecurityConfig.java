@@ -68,6 +68,23 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 )
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/",
+                                "/index.html",
+                                "/assets/**",
+                                "/framebucket-mark.png",
+                                "/framebucket-logo.png",
+                                "/favicon.ico",
+                                "/register",
+                                "/verify-email",
+                                "/payment",
+                                "/login",
+                                "/dashboard",
+                                "/customer-portal",
+                                "/quote/**",
+                                "/team-invite/**"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/subscriptions").permitAll()
                         .requestMatchers(
