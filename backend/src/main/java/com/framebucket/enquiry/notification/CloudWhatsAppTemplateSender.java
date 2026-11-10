@@ -80,16 +80,23 @@ public class CloudWhatsAppTemplateSender implements WhatsAppTemplateSender {
 
     private String metaErrorDetail(String responseBody) {
         try {
-            JsonNode error = objectMapper.readTree(responseBody).path("error");
+            JsonNode root = objectMapper.readTree(responseBody);
+            JsonNode error = root.path("error");
+            if (error.isMissingNode() || error.isNull()) {
+                error = root;
+            }
             String message = error.path("message").asText();
             String type = error.path("type").asText();
             String code = error.path("code").asText();
             String subcode = error.path("error_subcode").asText();
             String traceId = error.path("fbtrace_id").asText();
+            String userMessage = error.path("error_user_msg").asText();
 
             StringBuilder detail = new StringBuilder();
             if (!message.isBlank()) {
                 detail.append(message);
+            } else if (!userMessage.isBlank()) {
+                detail.append(userMessage);
             }
             if (!type.isBlank() || !code.isBlank() || !subcode.isBlank()) {
                 if (detail.length() > 0) {
@@ -113,10 +120,18 @@ public class CloudWhatsAppTemplateSender implements WhatsAppTemplateSender {
                 if (detail.length() > 0) detail.append("; ");
                 detail.append("fbtrace_id ").append(traceId);
             }
-            return detail.length() == 0 ? "." : ": " + detail;
+            return detail.length() == 0 ? ": Meta response " + compactResponse(responseBody) : ": " + detail;
         } catch (IOException ignored) {
-            // Keep the HTTP status as the diagnostic if Meta returns a non-JSON response.
+            return ": Meta response " + compactResponse(responseBody);
         }
-        return ".";
+    }
+
+    private String compactResponse(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return "(empty body)";
+        }
+        String compact = responseBody.replaceAll("\\s+", " ").trim();
+        int limit = 500;
+        return compact.length() <= limit ? compact : compact.substring(0, limit) + "…";
     }
 }
