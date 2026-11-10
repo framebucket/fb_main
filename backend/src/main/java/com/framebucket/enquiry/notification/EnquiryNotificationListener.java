@@ -17,15 +17,18 @@ public class EnquiryNotificationListener {
     private final EnquiryEmailSender emailSender;
     private final WhatsAppTemplateSender whatsAppSender;
     private final String enquiryTemplate;
+    private final String enquiryTemplateLanguage;
 
     public EnquiryNotificationListener(
             EnquiryEmailSender emailSender,
             WhatsAppTemplateSender whatsAppSender,
-            @Value("${app.whatsapp.enquiry-template:framebucket_enquiry_quote_link}") String enquiryTemplate
+            @Value("${app.whatsapp.enquiry-template:framebucket_enquiry_quote_link}") String enquiryTemplate,
+            @Value("${app.whatsapp.enquiry-language:${app.whatsapp.language:en}}") String enquiryTemplateLanguage
     ) {
         this.emailSender = emailSender;
         this.whatsAppSender = whatsAppSender;
         this.enquiryTemplate = enquiryTemplate;
+        this.enquiryTemplateLanguage = enquiryTemplateLanguage;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -42,6 +45,7 @@ public class EnquiryNotificationListener {
             whatsAppSender.sendTemplate(
                     whatsappNumber(notice.customerWhatsAppNumber()),
                     enquiryTemplate,
+                    enquiryTemplateLanguage,
                     List.of(notice.customerName(), notice.studioName(), notice.quotationLink())
             );
         } catch (RuntimeException exception) {

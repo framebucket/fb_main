@@ -16,13 +16,16 @@ public class TeamInviteNotificationListener {
     private static final Logger LOGGER = LoggerFactory.getLogger(TeamInviteNotificationListener.class);
     private final WhatsAppTemplateSender whatsAppSender;
     private final String inviteTemplate;
+    private final String inviteTemplateLanguage;
 
     public TeamInviteNotificationListener(
             WhatsAppTemplateSender whatsAppSender,
-            @Value("${app.whatsapp.team-invite-template:framebucket_team_member_invite}") String inviteTemplate
+            @Value("${app.whatsapp.team-invite-template:framebucket_team_member_invite}") String inviteTemplate,
+            @Value("${app.whatsapp.team-invite-language:${app.whatsapp.language:en}}") String inviteTemplateLanguage
     ) {
         this.whatsAppSender = whatsAppSender;
         this.inviteTemplate = inviteTemplate;
+        this.inviteTemplateLanguage = inviteTemplateLanguage;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -32,6 +35,7 @@ public class TeamInviteNotificationListener {
             whatsAppSender.sendTemplate(
                     "91" + IndianMobileNumber.normalize(notice.mobileNumber()),
                     inviteTemplate,
+                    inviteTemplateLanguage,
                     List.of(notice.memberName(), notice.studioName(), typeLabel, notice.invitationUrl())
             );
         } catch (RuntimeException exception) {

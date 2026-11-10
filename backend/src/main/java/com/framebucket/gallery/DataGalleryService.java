@@ -29,19 +29,22 @@ public class DataGalleryService {
     private final EnquiryEmailSender emailSender;
     private final WhatsAppTemplateSender whatsAppSender;
     private final String albumTemplate;
+    private final String albumTemplateLanguage;
 
     public DataGalleryService(
             EventBookingRepository events,
             DataServiceClient dataService,
             EnquiryEmailSender emailSender,
             WhatsAppTemplateSender whatsAppSender,
-            @Value("${app.whatsapp.album-design-template:framebucket_album_selection_finalized}") String albumTemplate
+            @Value("${app.whatsapp.album-design-template:framebucket_album_selection_finalized}") String albumTemplate,
+            @Value("${app.whatsapp.album-design-language:${app.whatsapp.language:en}}") String albumTemplateLanguage
     ) {
         this.events = events;
         this.dataService = dataService;
         this.emailSender = emailSender;
         this.whatsAppSender = whatsAppSender;
         this.albumTemplate = albumTemplate;
+        this.albumTemplateLanguage = albumTemplateLanguage;
     }
 
     public void provisionBestEffort(EventBooking event) {
@@ -179,7 +182,7 @@ public class DataGalleryService {
         } else {
             try {
                 String whatsappNumber = "91" + IndianMobileNumber.normalize(mobile);
-                whatsAppSender.sendTemplate(whatsappNumber, albumTemplate, List.of(customerName, albumLink));
+                whatsAppSender.sendTemplate(whatsappNumber, albumTemplate, albumTemplateLanguage, List.of(customerName, albumLink));
             } catch (RuntimeException exception) {
                 LOGGER.warn("Album design link saved for event {}, but the WhatsApp notification could not be sent.",
                         event.getEventCode(), exception);

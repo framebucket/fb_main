@@ -33,7 +33,7 @@ public class WhatsAppMobileOtpSender implements MobileOtpSender {
             @Value("${app.whatsapp.messages-url:}") String messagesUrl,
             @Value("${app.whatsapp.access-token:}") String accessToken,
             @Value("${app.whatsapp.mobile-verification-template:framebucket_mobile_verification}") String templateName,
-            @Value("${app.whatsapp.language:en}") String languageCode
+            @Value("${app.whatsapp.mobile-verification-language:${app.whatsapp.language:en}}") String languageCode
     ) {
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()

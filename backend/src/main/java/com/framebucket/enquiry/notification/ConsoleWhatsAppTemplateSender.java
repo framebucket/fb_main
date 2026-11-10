@@ -13,7 +13,8 @@ public class ConsoleWhatsAppTemplateSender implements WhatsAppTemplateSender {
     private static final Logger LOGGER = LoggerFactory.getLogger(ConsoleWhatsAppTemplateSender.class);
 
     @Override
-    public void sendTemplate(String recipientNumber, String templateName, List<String> bodyParameters) {
-        LOGGER.info("Local WhatsApp template '{}' for {} with parameters {}", templateName, recipientNumber, bodyParameters);
+    public void sendTemplate(String recipientNumber, String templateName, String languageCode, List<String> bodyParameters) {
+        LOGGER.info("Local WhatsApp template '{}' ({}) for {} with parameters {}",
+                templateName, languageCode, recipientNumber, bodyParameters);
     }
 }
