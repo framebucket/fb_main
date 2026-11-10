@@ -1,5 +1,6 @@
 package com.framebucket.user.auth.sms;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.framebucket.common.phone.IndianMobileNumber;
 import org.springframework.beans.factory.annotation.Value;
@@ -104,13 +105,40 @@ public class WhatsAppMobileOtpSender implements MobileOtpSender {
 
     private String metaErrorDetail(String responseBody) {
         try {
-            String message = objectMapper.readTree(responseBody)
-                    .path("error")
-                    .path("message")
-                    .asText();
+            JsonNode error = objectMapper.readTree(responseBody).path("error");
+            String message = error.path("message").asText();
+            String type = error.path("type").asText();
+            String code = error.path("code").asText();
+            String subcode = error.path("error_subcode").asText();
+            String traceId = error.path("fbtrace_id").asText();
+
+            StringBuilder detail = new StringBuilder();
             if (!message.isBlank()) {
-                return ": " + message;
+                detail.append(message);
             }
+            if (!type.isBlank() || !code.isBlank() || !subcode.isBlank()) {
+                if (detail.length() > 0) {
+                    detail.append(" (");
+                } else {
+                    detail.append("Meta error (");
+                }
+                if (!type.isBlank()) {
+                    detail.append(type);
+                }
+                if (!code.isBlank()) {
+                    if (!type.isBlank()) detail.append(' ');
+                    detail.append("code ").append(code);
+                }
+                if (!subcode.isBlank()) {
+                    detail.append(", subcode ").append(subcode);
+                }
+                detail.append(')');
+            }
+            if (!traceId.isBlank()) {
+                if (detail.length() > 0) detail.append("; ");
+                detail.append("fbtrace_id ").append(traceId);
+            }
+            return detail.length() == 0 ? "." : ": " + detail;
         } catch (IOException ignored) {
             // Keep the HTTP status as the diagnostic if Meta returns a non-JSON response.
         }
