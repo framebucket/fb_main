@@ -77,9 +77,53 @@ async function requestMultipart(path, body) {
     try { payload = JSON.parse(responseText); } catch { payload = { detail: responseText }; }
   }
   if (!response.ok) {
-    throw new Error(payload?.detail || payload?.message || 'The upload could not be completed.');
+    throw new Error(payload?.detail || payload?.message || `The upload failed (HTTP ${response.status}).`);
   }
   return payload;
+}
+
+async function downloadBlob(path, body, filename) {
+  if (!csrfToken) {
+    await loadCsrfToken();
+  }
+  const response = await fetch(apiBase + path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-XSRF-TOKEN': csrfToken,
+    },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const responseText = await response.text();
+    let payload = null;
+    try { payload = responseText ? JSON.parse(responseText) : null; } catch { payload = { detail: responseText }; }
+    const detail = payload?.detail;
+    const message = Array.isArray(detail)
+      ? detail.map((item) => item?.msg).filter(Boolean).join(', ')
+      : detail || payload?.message || `The download failed (HTTP ${response.status}).`;
+    throw new Error(message);
+  }
+
+  let downloadFilename = filename;
+  const contentDisposition = response.headers.get('Content-Disposition') || '';
+  const encodedFilename = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(contentDisposition)?.[1];
+  const regularFilename = /filename\s*=\s*"?([^";]+)"?/i.exec(contentDisposition)?.[1];
+  if (encodedFilename) {
+    try { downloadFilename = decodeURIComponent(encodedFilename); } catch { downloadFilename = encodedFilename; }
+  } else if (regularFilename) {
+    downloadFilename = regularFilename.trim();
+  }
+
+  const objectUrl = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = String(downloadFilename || filename).replace(/[\\/]/g, '_');
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
 export const api = {
@@ -128,6 +172,7 @@ export const api = {
   },
   customerMe: () => request('/api/customer-auth/me'),
   customerEvents: () => request('/api/customer-portal/events'),
+  customerFolders: (eventId) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/gallery/folders`),
   dataFolders: (eventId) => request(`/api/events/${encodeURIComponent(eventId)}/gallery/folders`),
   createDataFolder: (eventId, name) => request(`/api/events/${encodeURIComponent(eventId)}/gallery/folders`, { method: 'POST', body: { name } }),
   photographerMedia: (eventId, folderId) => request(`/api/events/${encodeURIComponent(eventId)}/gallery/media${folderId ? `?folderId=${encodeURIComponent(folderId)}` : ''}`),
@@ -137,6 +182,13 @@ export const api = {
     return requestMultipart(`/api/events/${encodeURIComponent(eventId)}/gallery/media?folderId=${encodeURIComponent(folderId || 'root')}`, form);
   },
   customerMedia: (eventId) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/gallery/media`),
+  customerSelection: (eventId) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/gallery/selection`),
+  saveCustomerSelection: (eventId, photoIds) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/gallery/selection`, { method: 'PUT', body: { photoIds } }),
+  downloadCustomerGallery: (eventId, photoIds, filename) => downloadBlob(
+    `/api/customer-portal/events/${encodeURIComponent(eventId)}/gallery/download`,
+    { photoIds: photoIds || [] },
+    filename,
+  ),
   submitAlbum: (eventId, photoIds) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/gallery/album-submissions`, { method: 'POST', body: { photoIds } }),
   photographerPreviewUrl: (eventId, mediaId) => `${apiBase}/api/events/${encodeURIComponent(eventId)}/gallery/media/${encodeURIComponent(mediaId)}/preview`,
   photographerOriginalUrl: (eventId, mediaId) => `${apiBase}/api/events/${encodeURIComponent(eventId)}/gallery/media/${encodeURIComponent(mediaId)}/original`,

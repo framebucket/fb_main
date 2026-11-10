@@ -1,6 +1,7 @@
 package com.framebucket.gallery;
 
 import com.framebucket.customer.model.CustomerPrincipal;
+import com.framebucket.enquiry.notification.EnquiryEmailSender;
 import com.framebucket.enquiry.notification.WhatsAppTemplateSender;
 import com.framebucket.event.model.EventBooking;
 import com.framebucket.event.repository.EventBookingRepository;
@@ -18,7 +19,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 public class DataGalleryService {
@@ -26,17 +26,20 @@ public class DataGalleryService {
 
     private final EventBookingRepository events;
     private final DataServiceClient dataService;
+    private final EnquiryEmailSender emailSender;
     private final WhatsAppTemplateSender whatsAppSender;
     private final String albumTemplate;
 
     public DataGalleryService(
             EventBookingRepository events,
             DataServiceClient dataService,
+            EnquiryEmailSender emailSender,
             WhatsAppTemplateSender whatsAppSender,
-            @Value("${app.whatsapp.album-design-template:framebucket_album_design_ready}") String albumTemplate
+            @Value("${app.whatsapp.album-design-template:framebucket_album_selection_finalized}") String albumTemplate
     ) {
         this.events = events;
         this.dataService = dataService;
+        this.emailSender = emailSender;
         this.whatsAppSender = whatsAppSender;
         this.albumTemplate = albumTemplate;
     }
@@ -84,6 +87,36 @@ public class DataGalleryService {
         return dataService.listMedia(storageEventId(event), event.getCustomer().getId().toString(), null);
     }
 
+    public Map<String, Object> foldersForCustomer(UUID eventId, CustomerPrincipal principal) {
+        EventBooking event = customerEvent(eventId, principal);
+        ensureProvisioned(event);
+        return dataService.listFolders(storageEventId(event), event.getPhotographer().getId().toString(),
+                event.getCustomer().getId().toString());
+    }
+
+    public Map<String, Object> selectionForCustomer(UUID eventId, CustomerPrincipal principal) {
+        EventBooking event = customerEvent(eventId, principal);
+        ensureProvisioned(event);
+        return dataService.albumSelection(storageEventId(event), event.getPhotographer().getId().toString(),
+                event.getCustomer().getId().toString());
+    }
+
+    public Map<String, Object> saveSelectionForCustomer(UUID eventId, CustomerPrincipal principal,
+                                                        List<String> photoIds) {
+        EventBooking event = customerEvent(eventId, principal);
+        ensureProvisioned(event);
+        return dataService.saveAlbumSelection(storageEventId(event), event.getPhotographer().getId().toString(),
+                event.getCustomer().getId().toString(), photoIds);
+    }
+
+    public DataServiceClient.MediaStream downloadForCustomer(UUID eventId, CustomerPrincipal principal,
+                                                              List<String> photoIds) {
+        EventBooking event = customerEvent(eventId, principal);
+        ensureProvisioned(event);
+        return dataService.downloadCustomerGallery(storageEventId(event), event.getCustomer().getId().toString(),
+                photoIds);
+    }
+
     public DataServiceClient.MediaStream previewForCustomer(UUID eventId, String mediaId, String range, CustomerPrincipal principal) {
         EventBooking event = customerEvent(eventId, principal);
         ensureProvisioned(event);
@@ -114,29 +147,43 @@ public class DataGalleryService {
         }
         event.setEventGallery(albumLink);
         events.save(event);
-        notifyPhotographer(event, submission, albumLink);
-        return submission;
+        notifyPhotographer(event, albumLink);
+        Map<String, Object> customerResult = new java.util.LinkedHashMap<>();
+        customerResult.put("status", submission.getOrDefault("status", "SUBMITTED"));
+        customerResult.put("photo_count", submission.getOrDefault("photo_count", 0));
+        customerResult.put("photo_numbers", submission.getOrDefault("photo_numbers", List.of()));
+        return customerResult;
     }
 
-    private void notifyPhotographer(EventBooking event, Map<String, Object> submission, String albumLink) {
+    private void notifyPhotographer(EventBooking event, String albumLink) {
+        String customerName = event.getCustomer().getName();
+        String body = "Hello,\n\nYour customer (" + customerName
+                + ") has finalised the Photo selection for Album designing. Please find the Raw photos link.\n\n"
+                + "Link: " + albumLink + "\n\nRegards,\nframebucket.in";
+        String email = event.getPhotographer().getEmail();
+        if (email == null || email.isBlank()) {
+            LOGGER.warn("Album design was submitted for event {}, but the photographer has no email address.",
+                    event.getEventCode());
+        } else {
+            try {
+                emailSender.send(email, "Photo selection finalized for album design", body);
+            } catch (RuntimeException exception) {
+                LOGGER.warn("Album design link saved for event {}, but the photographer email could not be sent.",
+                        event.getEventCode(), exception);
+            }
+        }
+
         String mobile = event.getPhotographer().getMobileNumber();
         if (mobile == null || mobile.isBlank()) {
             LOGGER.warn("Album design was submitted for event {}, but the photographer has no mobile number.", event.getEventCode());
-            return;
-        }
-        try {
-            Object rawNumbers = submission.get("photo_numbers");
-            String photoNumbers = rawNumbers instanceof List<?> numbers
-                    ? numbers.stream().map(item -> {
-                        if (item instanceof Map<?, ?> map && map.get("photo_number") != null) return String.valueOf(map.get("photo_number"));
-                        return String.valueOf(item);
-                    }).collect(Collectors.joining(", "))
-                    : String.valueOf(submission.getOrDefault("photo_count", ""));
-            String whatsappNumber = "91" + IndianMobileNumber.normalize(mobile);
-            whatsAppSender.sendTemplate(whatsappNumber, albumTemplate,
-                    List.of(event.getEventCode(), photoNumbers, albumLink));
-        } catch (RuntimeException exception) {
-            LOGGER.warn("Album design link saved for event {}, but the WhatsApp notification could not be sent.", event.getEventCode(), exception);
+        } else {
+            try {
+                String whatsappNumber = "91" + IndianMobileNumber.normalize(mobile);
+                whatsAppSender.sendTemplate(whatsappNumber, albumTemplate, List.of(customerName, albumLink));
+            } catch (RuntimeException exception) {
+                LOGGER.warn("Album design link saved for event {}, but the WhatsApp notification could not be sent.",
+                        event.getEventCode(), exception);
+            }
         }
     }
 

@@ -2537,16 +2537,32 @@ function CustomerPortalPage({ customer, onLogout }) {
 
 function CustomerGalleryModal({ event, onClose, onSubmitted }) {
   const [media, setMedia] = useState([]);
+  const [folders, setFolders] = useState([]);
+  const [folderId, setFolderId] = useState('__all');
   const [selectedIds, setSelectedIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [savingSelection, setSavingSelection] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [view, setView] = useState('gallery');
+  const [enlargedPhotoId, setEnlargedPhotoId] = useState(null);
+  const selectionSaveQueue = useRef(Promise.resolve());
+  const selectionRevision = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
-    api.customerMedia(event.eventId)
-      .then((response) => { if (!cancelled) setMedia(response.photos || []); })
+    Promise.all([
+      api.customerMedia(event.eventId),
+      api.customerFolders(event.eventId),
+      api.customerSelection(event.eventId),
+    ])
+      .then(([mediaResponse, folderResponse, selectionResponse]) => {
+        if (cancelled) return;
+        setMedia(mediaResponse.photos || []);
+        setFolders(folderResponse.folders || []);
+        setSelectedIds(selectionResponse.photo_ids || []);
+      })
       .catch((requestError) => { if (!cancelled) setError(requestError.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -2557,6 +2573,8 @@ function CustomerGalleryModal({ event, onClose, onSubmitted }) {
     setError('');
     setNotice('');
     try {
+      await selectionSaveQueue.current.catch(() => {});
+      await api.saveCustomerSelection(event.eventId, selectedIds);
       const result = await api.submitAlbum(event.eventId, selectedIds);
       onSubmitted(result);
     } catch (requestError) {
@@ -2566,41 +2584,178 @@ function CustomerGalleryModal({ event, onClose, onSubmitted }) {
     }
   }
 
-  function togglePhoto(photoId) {
-    setSelectedIds((current) => current.includes(photoId)
-      ? current.filter((id) => id !== photoId)
-      : [...current, photoId]);
+  function togglePhoto(photoId, shouldSelect = !selectedIds.includes(photoId)) {
+    const alreadySelected = selectedIds.includes(photoId);
+    if (alreadySelected === shouldSelect) return;
+    const nextIds = shouldSelect
+      ? [...selectedIds, photoId]
+      : selectedIds.filter((id) => id !== photoId);
+    setSelectedIds(nextIds);
+    setError('');
+    setNotice('');
+    setSavingSelection(true);
+    const revision = ++selectionRevision.current;
+    selectionSaveQueue.current = selectionSaveQueue.current
+      .catch(() => {})
+      .then(() => api.saveCustomerSelection(event.eventId, nextIds))
+      .then(() => {
+        if (revision === selectionRevision.current) setSavingSelection(false);
+      })
+      .catch((requestError) => {
+        if (revision === selectionRevision.current) {
+          setSavingSelection(false);
+          setError(requestError.message);
+        }
+      });
+  }
+
+  async function finalizeSelection() {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await selectionSaveQueue.current.catch(() => {});
+      await api.saveCustomerSelection(event.eventId, selectedIds);
+      setView('review');
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function downloadPhotos(photoIds) {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    const safeEventName = String(event.eventName || 'gallery').replace(/[^a-z0-9._-]+/gi, '-');
+    const singlePhoto = photoIds?.length === 1
+      ? media.find((item) => item.photo_id === photoIds[0])
+      : !photoIds?.length && media.length === 1 ? media[0] : null;
+    const singleExtension = singlePhoto?.media_type === 'image'
+      ? '.jpg'
+      : singlePhoto?.original_filename?.match(/\.[^./\\]+$/)?.[0] || '';
+    const singleFilename = singlePhoto
+      ? `${String(singlePhoto.photo_number).padStart(5, '0')}_${String(singlePhoto.original_filename || 'photo').replace(/\.[^./\\]+$/, '')}${singleExtension}`
+        .replace(/[^a-z0-9._-]+/gi, '_').replace(/^[._]+|[._]+$/g, '')
+      : null;
+    const filename = singleFilename || `FrameBucket-${safeEventName}-${photoIds?.length ? 'selected' : 'all'}-photos.zip`;
+    try {
+      await api.downloadCustomerGallery(event.eventId, photoIds || [], filename);
+      setNotice(photoIds?.length === 1 ? 'Photo downloaded.' : photoIds?.length ? 'Selected photos downloaded.' : 'All gallery photos downloaded.');
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const visibleMedia = folderId === '__all'
+    ? media
+    : media.filter((item) => item.folder_id === folderId);
+  const navigablePhotos = visibleMedia.filter((item) => item.media_type !== 'video');
+  const selectedMedia = media.filter((item) => selectedIds.includes(item.photo_id));
+  const folderNames = new Map(folders.map((folder) => [folder.folder_id, folder.name]));
+  const selectedByFolder = folders
+    .map((folder) => ({
+      ...folder,
+      photos: selectedMedia.filter((item) => item.folder_id === folder.folder_id)
+        .sort((a, b) => a.photo_number - b.photo_number),
+    }))
+    .filter((folder) => folder.photos.length > 0);
+  const enlargedPhoto = media.find((item) => item.photo_id === enlargedPhotoId);
+  const enlargedPhotoIndex = navigablePhotos.findIndex((item) => item.photo_id === enlargedPhotoId);
+
+  function moveEnlargedPhoto(direction) {
+    if (navigablePhotos.length < 2 || enlargedPhotoIndex < 0) return;
+    const nextIndex = (enlargedPhotoIndex + direction + navigablePhotos.length) % navigablePhotos.length;
+    setEnlargedPhotoId(navigablePhotos[nextIndex].photo_id);
   }
 
   return (
     <div className="modal-backdrop gallery-modal-backdrop" role="presentation" onMouseDown={(clickEvent) => { if (clickEvent.target === clickEvent.currentTarget && !busy) onClose(); }}>
       <section className="gallery-modal" role="dialog" aria-modal="true" aria-labelledby="customer-gallery-title">
-        <div className="modal-heading"><div><p className="eyebrow">YOUR EVENT PHOTOS</p><h2 id="customer-gallery-title">{event.eventName} gallery</h2></div><button className="modal-close" type="button" onClick={onClose} disabled={busy} aria-label="Close gallery">×</button></div>
-        <p className="gallery-modal-note">{event.albumSubmitted ? 'Your selection has been sent to your photographer. You can still view this gallery here.' : 'Choose the photos you would like your photographer to prepare for album design. Videos are available to view but cannot be selected for an album.'}</p>
+        <div className="modal-heading"><div><p className="eyebrow">YOUR EVENT PHOTOS</p><h2 id="customer-gallery-title">{view === 'review' ? 'Finalize selection' : `${event.eventName} gallery`}</h2></div><button className="modal-close" type="button" onClick={onClose} disabled={busy} aria-label="Close gallery">×</button></div>
+        <p className="gallery-modal-note">{event.albumSubmitted ? 'Your selection has been sent to your photographer. You can still view and download this gallery.' : 'Choose photos for album design. Your selection is saved while you move between folders. Videos can be viewed and downloaded, but cannot be selected for album design.'}</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         {notice && <p className="form-success" role="status">{notice}</p>}
         {loading ? <p className="customer-empty">Loading event gallery…</p> : media.length === 0 ? (
           <div className="gallery-empty"><span aria-hidden="true">✦</span><h3>Your photographer is preparing this gallery.</h3><p>Check back once the processed event photos are ready.</p></div>
-        ) : (
-          <div className="gallery-grid customer-gallery-grid">
-            {media.map((item) => {
-              const selected = selectedIds.includes(item.photo_id);
-              return (
-                <article className={`gallery-card customer-gallery-card ${selected ? 'is-selected' : ''}`} key={item.photo_id}>
-                  <div className="gallery-card-preview">
-                    {item.media_type === 'video'
-                      ? <video src={api.customerPreviewUrl(event.eventId, item.photo_id)} controls preload="metadata" aria-label={item.original_filename} />
-                      : <img src={api.customerPreviewUrl(event.eventId, item.photo_id)} alt={item.original_filename} loading="lazy" />}
-                    <span className="gallery-photo-number">{item.media_type === 'video' ? 'VIDEO' : `#${item.photo_number}`}</span>
-                  </div>
-                  <div className="gallery-card-copy"><b title={item.original_filename}>{item.original_filename}</b><span>{item.media_type === 'video' ? 'Video preview' : 'Processed photo'}</span></div>
-                  {item.media_type !== 'video' && !event.albumSubmitted && <label className="gallery-select-photo"><input type="checkbox" checked={selected} onChange={() => togglePhoto(item.photo_id)} disabled={busy} /> Select for album design</label>}
-                </article>
-              );
-            })}
+        ) : view === 'review' ? (
+          <div className="gallery-selection-review">
+            <p>Review the photo numbers selected from each folder before sending your selection to the photographer.</p>
+            {selectedByFolder.length === 0 ? <p className="customer-empty">No photos selected.</p> : selectedByFolder.map((folder) => (
+              <section className="gallery-review-folder" key={folder.folder_id}>
+                <h3>{folder.name}</h3>
+                <ul>{folder.photos.map((item) => <li key={item.photo_id}><b>#{item.photo_number}</b><span>{item.original_filename}</span></li>)}</ul>
+              </section>
+            ))}
           </div>
+        ) : (
+          <>
+            <div className="customer-gallery-toolbar">
+              <label className="gallery-field">Folder
+                <select value={folderId} onChange={(changeEvent) => setFolderId(changeEvent.target.value)}>
+                  <option value="__all">All folders</option>
+                  {folders.map((folder) => <option key={folder.folder_id} value={folder.folder_id}>{folder.name}</option>)}
+                </select>
+              </label>
+              <div className="customer-gallery-downloads">
+                <button className="button button-quiet" type="button" onClick={() => downloadPhotos([])} disabled={busy || media.length === 0}>Download all photos</button>
+                <button className="button button-dark" type="button" onClick={() => downloadPhotos(selectedIds)} disabled={busy || selectedIds.length === 0}>Download selected</button>
+              </div>
+            </div>
+            {savingSelection && <p className="gallery-selection-status" role="status">Saving selection to your temporary folder…</p>}
+            {!savingSelection && !event.albumSubmitted && selectedIds.length > 0 && <p className="gallery-selection-status" role="status">{selectedIds.length} photo{selectedIds.length === 1 ? '' : 's'} staged for album design across your folders.</p>}
+            {visibleMedia.length === 0 ? (
+              <div className="gallery-empty"><span aria-hidden="true">✦</span><h3>This folder is ready.</h3><p>There are no customer photos in this folder yet.</p></div>
+            ) : (
+              <div className="gallery-grid customer-gallery-grid">
+                {visibleMedia.map((item) => {
+                  const selected = selectedIds.includes(item.photo_id);
+                  return (
+                    <article className={`gallery-card customer-gallery-card ${selected ? 'is-selected' : ''}`} key={item.photo_id}>
+                      <div className="gallery-card-preview">
+                        {item.media_type === 'video'
+                          ? <video src={api.customerPreviewUrl(event.eventId, item.photo_id)} controls preload="metadata" aria-label={item.original_filename} />
+                          : <button className="customer-photo-open" type="button" onClick={() => setEnlargedPhotoId(item.photo_id)} aria-label={`Enlarge photo ${item.photo_number}`}><img src={api.customerPreviewUrl(event.eventId, item.photo_id)} alt={item.original_filename} loading="lazy" /></button>}
+                        <span className="gallery-photo-number">{item.media_type === 'video' ? 'VIDEO' : `#${item.photo_number}`}</span>
+                        {item.media_type !== 'video' && !event.albumSubmitted && <label className={`gallery-photo-checkbox ${selected ? 'is-selected' : ''}`} title={`Select photo ${item.photo_number} for album design`}><input id={`customer-photo-select-${item.photo_id}`} type="checkbox" aria-label={`Select photo ${item.photo_number} for album design`} checked={selected} onChange={(changeEvent) => togglePhoto(item.photo_id, changeEvent.target.checked)} disabled={busy} /></label>}
+                      </div>
+                      <div className="gallery-card-copy"><b title={item.original_filename}>{item.original_filename}</b><span>{item.media_type === 'video' ? 'Video preview' : `${folderNames.get(item.folder_id) || 'Gallery'} · Processed photo`}</span></div>
+                      {item.media_type !== 'video' && !event.albumSubmitted && <label className="gallery-select-caption" htmlFor={`customer-photo-select-${item.photo_id}`}>select for album design</label>}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
-        <div className="gallery-modal-actions"><span>{event.albumSubmitted ? 'Selection already sent' : `${selectedIds.length} photos selected`}</span><button className="button button-quiet" type="button" onClick={onClose} disabled={busy}>Close</button>{!event.albumSubmitted && <button className="button button-dark" type="button" onClick={submitSelection} disabled={busy || loading || selectedIds.length === 0}>{busy ? 'Sending selection…' : 'Submit for album design ↗'}</button>}</div>
+        <div className="gallery-modal-actions">
+          <span>{event.albumSubmitted ? 'Selection already sent' : `${selectedIds.length} photos selected`}</span>
+          {view === 'review' ? <>
+            <button className="button button-quiet" type="button" onClick={() => setView('gallery')} disabled={busy}>Back to gallery</button>
+            {!event.albumSubmitted && <button className="button button-dark" type="button" onClick={submitSelection} disabled={busy || selectedIds.length === 0}>{busy ? 'Submitting…' : 'Submit for Album design'}</button>}
+          </> : <>
+            <button className="button button-quiet" type="button" onClick={onClose} disabled={busy}>Close</button>
+            {!event.albumSubmitted && <button className="button button-dark" type="button" onClick={finalizeSelection} disabled={busy || loading || selectedIds.length === 0 || savingSelection}>{busy ? 'Preparing…' : 'Finalize Selection'}</button>}
+          </>}
+        </div>
+        {enlargedPhoto && <div className="gallery-lightbox" role="presentation" onMouseDown={(clickEvent) => { if (clickEvent.target === clickEvent.currentTarget) setEnlargedPhotoId(null); }}>
+          <section className="gallery-lightbox-panel" role="dialog" aria-modal="true" aria-label={`Photo ${enlargedPhoto.photo_number}`}>
+            <button className="gallery-lightbox-close" type="button" onClick={() => setEnlargedPhotoId(null)} aria-label="Close enlarged photo">×</button>
+            <img src={api.customerPreviewUrl(event.eventId, enlargedPhoto.photo_id)} alt={enlargedPhoto.original_filename} />
+            <div className="gallery-lightbox-actions">
+              <div className="gallery-lightbox-navigation">
+                <button className="button button-quiet" type="button" onClick={() => moveEnlargedPhoto(-1)} disabled={navigablePhotos.length < 2}>← Previous</button>
+                <span className="gallery-lightbox-number">Photo {enlargedPhotoIndex + 1} of {navigablePhotos.length} · #{enlargedPhoto.photo_number}</span>
+                <button className="button button-quiet" type="button" onClick={() => moveEnlargedPhoto(1)} disabled={navigablePhotos.length < 2}>Next →</button>
+              </div>
+              {!event.albumSubmitted && <label className={`gallery-select-photo gallery-lightbox-selection ${selectedIds.includes(enlargedPhoto.photo_id) ? 'is-selected' : ''}`}><input type="checkbox" checked={selectedIds.includes(enlargedPhoto.photo_id)} onChange={(changeEvent) => togglePhoto(enlargedPhoto.photo_id, changeEvent.target.checked)} disabled={busy} /> select for album design</label>}
+              <button className="button button-dark" type="button" onClick={() => downloadPhotos([])} disabled={busy}>{busy ? 'Preparing download…' : 'Download all photos'}</button>
+            </div>
+          </section>
+        </div>}
       </section>
     </div>
   );

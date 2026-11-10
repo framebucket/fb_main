@@ -1,13 +1,19 @@
 package com.framebucket.gallery;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
@@ -16,6 +22,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -28,6 +35,7 @@ import java.util.Map;
 public class DataServiceClient {
     private static final String SERVICE_KEY_HEADER = "X-FrameBucket-Service-Key";
     private static final HttpClient STREAM_CLIENT = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
@@ -35,15 +43,18 @@ public class DataServiceClient {
             new ParameterizedTypeReference<>() {};
 
     private final RestClient restClient;
+    private final ObjectMapper objectMapper;
     private final String baseUrl;
     private final String serviceToken;
 
     public DataServiceClient(
             RestClient.Builder builder,
+            ObjectMapper objectMapper,
             @Value("${app.data-service.base-url:http://127.0.0.1:8001}") String baseUrl,
             @Value("${app.data-service.token:}") String serviceToken
     ) {
-        this.restClient = builder.build();
+        this.restClient = builder.requestFactory(new JdkClientHttpRequestFactory(STREAM_CLIENT)).build();
+        this.objectMapper = objectMapper;
         this.baseUrl = baseUrl.replaceAll("/+$", "");
         this.serviceToken = serviceToken;
     }
@@ -62,11 +73,23 @@ public class DataServiceClient {
                 "photographer_id", photographerId, "customer_id", customerId));
     }
 
+    public Map<String, Object> albumSelection(String eventId, String photographerId, String customerId) {
+        return getJson(query("/api/v1/events/" + eventId + "/album-selection",
+                "photographer_id", photographerId, "customer_id", customerId));
+    }
+
+    public Map<String, Object> saveAlbumSelection(String eventId, String photographerId,
+                                                   String customerId, List<String> photoIds) {
+        URI uri = query("/api/v1/events/" + eventId + "/album-selection",
+                "photographer_id", photographerId, "customer_id", customerId);
+        return putJson(uri, Map.of("photographer_id", photographerId,
+                "customer_id", customerId, "photo_ids", photoIds));
+    }
+
     public Map<String, Object> createFolder(String eventId, String photographerId, String customerId, String name) {
         URI uri = query("/api/v1/events/" + eventId + "/folders",
                 "photographer_id", photographerId, "customer_id", customerId);
-        return exchange(() -> restClient.post().uri(uri).header(SERVICE_KEY_HEADER, token())
-                .contentType(MediaType.APPLICATION_JSON).body(Map.of("name", name)).retrieve().body(JSON_MAP));
+        return postJson(uri, Map.of("name", name));
     }
 
     public Map<String, Object> listMedia(String eventId, String customerId, String folderId) {
@@ -83,12 +106,17 @@ public class DataServiceClient {
                 "customer_id", customerId,
                 "folder_id", folderId == null || folderId.isBlank() ? "root" : folderId);
         return exchange(() -> {
-            MultipartBodyBuilder builder = new MultipartBodyBuilder();
+            MultiValueMap<String, Object> multipart = new LinkedMultiValueMap<>();
             Resource resource = file.getResource();
-            builder.part("file", resource).filename(file.getOriginalFilename());
+            HttpHeaders partHeaders = new HttpHeaders();
+            String filename = file.getOriginalFilename();
+            partHeaders.setContentDispositionFormData(
+                    "file", filename == null || filename.isBlank() ? "upload" : filename);
+            partHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            multipart.add("file", new HttpEntity<>(resource, partHeaders));
             return restClient.post().uri(uri).header(SERVICE_KEY_HEADER, token())
                     .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(builder.build()).retrieve().body(JSON_MAP);
+                    .body(multipart).retrieve().body(JSON_MAP);
         });
     }
 
@@ -110,9 +138,93 @@ public class DataServiceClient {
                 "photographer_id", photographerId, "customer_id", customerId), "attachment", null);
     }
 
+    public MediaStream downloadCustomerGallery(String eventId, String customerId, List<String> photoIds) {
+        URI uri = uri("/api/v1/events/" + eventId + "/downloads");
+        byte[] json;
+        try {
+            json = objectMapper.writeValueAsBytes(Map.of(
+                    "customer_id", customerId,
+                    "photo_ids", photoIds == null ? List.of() : photoIds
+            ));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("Could not encode the gallery download request.", exception);
+        }
+
+        HttpRequest request = HttpRequest.newBuilder(uri)
+                .timeout(Duration.ofMinutes(10))
+                .header(SERVICE_KEY_HEADER, token())
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .POST(HttpRequest.BodyPublishers.ofByteArray(json))
+                .build();
+        try {
+            HttpResponse<InputStream> response = STREAM_CLIENT.send(
+                    request, HttpResponse.BodyHandlers.ofInputStream());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                String message;
+                try (InputStream body = response.body()) {
+                    message = new String(body.readAllBytes(), StandardCharsets.UTF_8);
+                }
+                throw serviceError(response.statusCode(), message);
+            }
+            return new MediaStream(
+                    response.statusCode(),
+                    response.headers().firstValue(HttpHeaders.CONTENT_TYPE).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE),
+                    response.headers().firstValue(HttpHeaders.CONTENT_DISPOSITION).orElse("attachment"),
+                    null,
+                    null,
+                    response.headers().firstValueAsLong(HttpHeaders.CONTENT_LENGTH).orElse(-1L),
+                    response.body()
+            );
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "The data-service download was interrupted.", exception);
+        } catch (IOException exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "The Python data service is unavailable. Start it on " + baseUrl + ".", exception);
+        }
+    }
+
     private Map<String, Object> postJson(String path, Object body) {
-        return exchange(() -> restClient.post().uri(uri(path)).header(SERVICE_KEY_HEADER, token())
-                .contentType(MediaType.APPLICATION_JSON).body(body).retrieve().body(JSON_MAP));
+        return postJson(uri(path), body);
+    }
+
+    private Map<String, Object> postJson(URI uri, Object body) {
+        return sendJson(uri, "POST", body);
+    }
+
+    private Map<String, Object> putJson(URI uri, Object body) {
+        return sendJson(uri, "PUT", body);
+    }
+
+    private Map<String, Object> sendJson(URI uri, String method, Object body) {
+        String serviceKey = token();
+        try {
+            byte[] json = objectMapper.writeValueAsBytes(body);
+            HttpRequest request = HttpRequest.newBuilder(uri)
+                    .timeout(Duration.ofMinutes(2))
+                    .header(SERVICE_KEY_HEADER, serviceKey)
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .method(method, HttpRequest.BodyPublishers.ofByteArray(json))
+                    .build();
+            HttpResponse<String> response = STREAM_CLIENT.send(
+                    request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw serviceError(response.statusCode(), response.body());
+            }
+            Map<String, Object> result = objectMapper.readValue(
+                    response.body(), new TypeReference<Map<String, Object>>() {});
+            return result == null ? Map.of() : result;
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "The data-service request was interrupted.", exception);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("Could not encode or decode the Python data-service JSON.", exception);
+        } catch (IOException exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "The Python data service is unavailable. Start it on " + baseUrl + ".", exception);
+        }
     }
 
     private Map<String, Object> getJson(URI uri) {
