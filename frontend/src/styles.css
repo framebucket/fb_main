@@ -1167,6 +1167,23 @@ body, #root { min-height: 100vh; color: var(--ink); background: var(--paper); }
 .gallery-upload.is-busy { opacity: .62; cursor: wait; }
 .gallery-event-note { margin: -5px 0 0; color: var(--muted); font-size: 12px; }
 .gallery-event-note b { color: var(--ink); font-family: var(--mono); }
+.local-sync-panel { display: grid; gap: 13px; padding: 18px; border: 1px solid var(--line); background: var(--surface-raised, var(--surface)); }
+.local-sync-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.local-sync-heading .eyebrow { margin: 0 0 6px; color: var(--coral-dark); font: 10px var(--mono); letter-spacing: .1em; }
+.local-sync-heading h3 { margin: 0; color: var(--ink); font: 22px/1.2 var(--serif); }
+.local-sync-heading p:last-child { max-width: 720px; margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.local-sync-indicator { flex: none; padding: 6px 9px; border: 1px solid var(--line); color: var(--muted); font: 9px var(--mono); letter-spacing: .08em; }
+.local-sync-indicator.is-running { border-color: var(--coral-dark); color: var(--coral-dark); }
+.local-sync-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.local-sync-folder-name { overflow: hidden; max-width: min(440px, 100%); color: var(--ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.local-sync-option { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.local-sync-option input { width: 16px; height: 16px; margin: 0; accent-color: var(--coral-dark); }
+.local-sync-status { display: grid; gap: 4px; padding: 10px 12px; border-left: 2px solid var(--line); color: var(--muted); background: rgba(0,0,0,.08); font-size: 12px; line-height: 1.5; }
+.local-sync-current { overflow-wrap: anywhere; color: var(--ink); }
+.local-sync-error, .local-sync-warning { margin: 0; padding: 9px 11px; border: 1px solid var(--line); font-size: 12px; line-height: 1.5; }
+.local-sync-error { border-color: var(--error-border, #8c4b4b); color: var(--error-ink, #e8a4a4); background: var(--error-surface, rgba(115, 32, 32, .2)); }
+.local-sync-warning { color: var(--muted); }
+.local-sync-note { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .gallery-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .gallery-card { min-width: 0; overflow: hidden; border: 1px solid var(--line); background: var(--surface-raised, var(--surface)); }
 .gallery-card-preview { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #101a24; }
@@ -1233,6 +1250,10 @@ body, #root { min-height: 100vh; color: var(--ink); background: var(--paper); }
   .gallery-module { padding: 18px; }
   .gallery-intro { align-items: flex-start; }
   .gallery-intro h2 { font-size: 29px; }
+  .local-sync-panel { padding: 14px; }
+  .local-sync-heading { flex-direction: column; gap: 10px; }
+  .local-sync-controls { align-items: stretch; flex-direction: column; }
+  .local-sync-controls .button { width: 100%; }
   .gallery-toolbar { grid-template-columns: 1fr; }
   .gallery-create-folder { grid-template-columns: minmax(0, 1fr) auto; }
   .gallery-upload { width: 100%; }
@@ -1301,4 +1322,36 @@ body, #root { min-height: 100vh; color: var(--ink); background: var(--paper); }
   .header-actions .button, .payment-header .button { font-size: 12px; }
   .module-tab, .customer-subtab { font-size: 13px; }
   .workflow-sequence { font-size: 11px; }
+}
+
+.guest-checkin-shell { display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 28px 20px 20px; background: radial-gradient(ellipse at 50% 5%, rgba(198,164,92,.09), transparent 46%), var(--paper); }
+.guest-checkin-header { width: min(620px, 100%); margin-bottom: 28px; }
+.guest-checkin-header .brand { width: auto; height: 48px; }
+.guest-checkin-header .brand img.brand-mark { width: 38px; height: 38px; }
+.guest-checkin-card { width: min(620px, 100%); padding: clamp(24px, 5vw, 48px); border: 1px solid var(--line); background: linear-gradient(145deg, rgba(255,255,255,.025), transparent 55%), var(--surface); box-shadow: 0 24px 70px rgba(0,0,0,.22); }
+.guest-checkin-card > .eyebrow { margin-bottom: 20px; }
+.guest-checkin-card h1 { max-width: 490px; font-size: clamp(36px, 8vw, 54px); }
+.guest-checkin-copy { margin: 14px 0 0; color: var(--muted); font-size: 14px; line-height: 1.75; }
+.guest-checkin-form { display: grid; gap: 18px; margin-top: 28px; }
+.guest-checkin-form > label:not(.guest-consent) { display: grid; gap: 8px; color: var(--ink); font-size: 12px; font-weight: 600; }
+.guest-checkin-form input:not([type="checkbox"]) { min-width: 0; width: 100%; min-height: 48px; padding: 0 13px; border: 1px solid var(--input-border); border-radius: 2px; color: var(--ink); background: var(--input-surface); }
+.guest-checkin-form input[type="file"] { height: auto; padding: 10px; color: var(--muted); font-size: 12px; }
+.guest-checkin-form input:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.guest-checkin-form .field-hint, .guest-selfie-name { color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.5; }
+.guest-selfie-name { overflow-wrap: anywhere; }
+.guest-checkin-form .guest-consent { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: 10px; color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.55; }
+.guest-checkin-form .guest-consent input { width: 17px; height: 17px; margin: 1px 0 0; accent-color: var(--coral); }
+.guest-checkin-form .form-footnote { margin: -4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.6; text-align: center; }
+.guest-checkin-result { display: grid; justify-items: start; gap: 13px; }
+.guest-checkin-result h1 { font-size: clamp(34px, 7vw, 48px); }
+.guest-checkin-result > p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.guest-checkin-result .guest-checkin-match-count { color: var(--coral-dark); font-weight: 600; }
+.guest-checkin-result .button { margin-top: 8px; }
+.guest-checkin-mark { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid rgba(181,201,155,.4); border-radius: 50%; color: var(--success); background: var(--success-surface); font-size: 21px; }
+.guest-checkin-footer { width: min(620px, 100%); padding: 18px 0 0; color: var(--muted); font-size: 10px; }
+.event-qr-download { min-width: 90px; }
+@media (max-width: 600px) {
+  .guest-checkin-shell { padding: 16px 12px; }
+  .guest-checkin-header { margin-bottom: 14px; }
+  .guest-checkin-card { padding: 24px 18px; }
 }

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -118,6 +119,45 @@ public class DataServiceClient {
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(multipart).retrieve().body(JSON_MAP);
         });
+    }
+
+    public Map<String, Object> registerGuestFace(String eventId, String guestId, String customerId,
+                                                  byte[] selfieBytes, String filename, MediaType mediaType) {
+        URI uri = query("/api/v1/events/" + eventId + "/guests/" + guestId + "/face",
+                "customer_id", customerId);
+        return exchange(() -> {
+            MultiValueMap<String, Object> multipart = new LinkedMultiValueMap<>();
+            ByteArrayResource resource = new ByteArrayResource(selfieBytes) {
+                @Override
+                public String getFilename() {
+                    return filename;
+                }
+            };
+            HttpHeaders partHeaders = new HttpHeaders();
+            partHeaders.setContentDispositionFormData("file", filename);
+            partHeaders.setContentType(mediaType);
+            multipart.add("file", new HttpEntity<>(resource, partHeaders));
+            return restClient.post().uri(uri).header(SERVICE_KEY_HEADER, token())
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(multipart).retrieve().body(JSON_MAP);
+        });
+    }
+
+    public void deleteGuestFace(String eventId, String guestId, String customerId) {
+        sendJson(query("/api/v1/events/" + eventId + "/guests/" + guestId + "/face",
+                "customer_id", customerId), "DELETE", Map.of());
+    }
+
+    public byte[] whatsappPhotoBytes(String eventId, String photoId, String customerId) {
+        MediaStream media = openStream(query(
+                "/api/v1/events/" + eventId + "/photos/" + photoId + "/whatsapp-preview",
+                "customer_id", customerId), "inline", null);
+        try (InputStream input = media.body()) {
+            return input.readAllBytes();
+        } catch (IOException exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Could not read the WhatsApp-ready event photo.", exception);
+        }
     }
 
     public Map<String, Object> submitAlbum(String eventId, String photographerId, String customerId, List<String> photoIds) {

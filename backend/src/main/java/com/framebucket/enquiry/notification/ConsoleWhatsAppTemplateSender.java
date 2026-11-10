@@ -9,12 +9,22 @@ import java.util.List;
 
 @Component
 @ConditionalOnProperty(name = "app.whatsapp.mode", havingValue = "console", matchIfMissing = true)
-public class ConsoleWhatsAppTemplateSender implements WhatsAppTemplateSender {
+public class ConsoleWhatsAppTemplateSender implements WhatsAppTemplateSender, WhatsAppPhotoSender {
     private static final Logger LOGGER = LoggerFactory.getLogger(ConsoleWhatsAppTemplateSender.class);
 
     @Override
     public void sendTemplate(String recipientNumber, String templateName, String languageCode, List<String> bodyParameters) {
         LOGGER.info("Local WhatsApp template '{}' ({}) for {} with parameters {}",
                 templateName, languageCode, recipientNumber, bodyParameters);
+    }
+
+    @Override
+    public void sendPhotoTemplate(String recipientNumber, String templateName, String languageCode,
+                                  byte[] jpegBytes, String filename, List<String> bodyParameters) {
+        String maskedRecipient = recipientNumber == null || recipientNumber.length() < 2
+                ? "[redacted]" : "…" + recipientNumber.substring(recipientNumber.length() - 2);
+        LOGGER.info("Local WhatsApp photo template '{}' ({}) for {} with file {} ({} bytes)",
+                templateName, languageCode, maskedRecipient, filename,
+                jpegBytes == null ? 0 : jpegBytes.length);
     }
 }

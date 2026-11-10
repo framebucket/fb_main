@@ -28,6 +28,7 @@ public class DataGalleryService {
     private final DataServiceClient dataService;
     private final EnquiryEmailSender emailSender;
     private final WhatsAppTemplateSender whatsAppSender;
+    private final GuestPhotoDeliveryService guestPhotoDeliveryService;
     private final String albumTemplate;
     private final String albumTemplateLanguage;
 
@@ -36,6 +37,7 @@ public class DataGalleryService {
             DataServiceClient dataService,
             EnquiryEmailSender emailSender,
             WhatsAppTemplateSender whatsAppSender,
+            GuestPhotoDeliveryService guestPhotoDeliveryService,
             @Value("${app.whatsapp.album-design-template:framebucket_album_selection_finalized}") String albumTemplate,
             @Value("${app.whatsapp.album-design-language:${app.whatsapp.language:en}}") String albumTemplateLanguage
     ) {
@@ -43,6 +45,7 @@ public class DataGalleryService {
         this.dataService = dataService;
         this.emailSender = emailSender;
         this.whatsAppSender = whatsAppSender;
+        this.guestPhotoDeliveryService = guestPhotoDeliveryService;
         this.albumTemplate = albumTemplate;
         this.albumTemplateLanguage = albumTemplateLanguage;
     }
@@ -80,8 +83,19 @@ public class DataGalleryService {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose a non-empty photo or video file.");
         }
-        return dataService.upload(storageEventId(event), principal.getId().toString(),
-                event.getCustomer().getId().toString(), folderId, file);
+        Map<String, Object> result = new java.util.LinkedHashMap<>(dataService.upload(
+                storageEventId(event), principal.getId().toString(),
+                event.getCustomer().getId().toString(), folderId, file));
+        try {
+            Object matchedGuestIds = result.remove("matched_guest_ids");
+            guestPhotoDeliveryService.enqueueUploadMatches(event, matchedGuestIds,
+                    result.get("photo_id") instanceof String photoId ? photoId : null,
+                    result.get("photo_number") instanceof Number number ? number.intValue() : null);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("The upload succeeded for event {}, but matched guest photo messages could not be queued.",
+                    event.getEventCode(), exception);
+        }
+        return result;
     }
 
     public Map<String, Object> mediaForCustomer(UUID eventId, CustomerPrincipal principal) {

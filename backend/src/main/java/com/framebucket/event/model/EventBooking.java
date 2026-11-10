@@ -81,6 +81,9 @@ public class EventBooking {
     @Column(name = "event_gallery", columnDefinition = "TEXT")
     private String eventGallery;
 
+    @Column(name = "guest_access_token", nullable = false, unique = true, length = 64)
+    private String guestAccessToken;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -108,6 +111,10 @@ public class EventBooking {
     void setCreatedAtIfMissing() {
         if (createdAt == null) {
             createdAt = Instant.now();
+        }
+        if (guestAccessToken == null || guestAccessToken.isBlank()) {
+            guestAccessToken = UUID.randomUUID().toString().replace("-", "")
+                    + UUID.randomUUID().toString().replace("-", "");
         }
     }
 
@@ -156,6 +163,8 @@ public class EventBooking {
     public Instant getLocationUpdatedAt() { return locationUpdatedAt; }
 
     public String getEventGallery() { return eventGallery; }
+
+    public String getGuestAccessToken() { return guestAccessToken; }
 
     public void setEventGallery(String eventGallery) { this.eventGallery = eventGallery; }
 

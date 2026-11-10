@@ -7,9 +7,13 @@ import com.framebucket.event.api.EventDtos.AssigneeUpdateRequest;
 import com.framebucket.event.api.EventDtos.EventTypeCreateRequest;
 import com.framebucket.event.api.EventDtos.EventTypeResponse;
 import com.framebucket.event.service.EventService;
+import com.framebucket.event.service.EventQrCodeService;
 import com.framebucket.user.auth.model.PhotographerPrincipal;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,14 +32,30 @@ import java.util.UUID;
 @RequestMapping("/api/events")
 public class EventController {
     private final EventService eventService;
+    private final EventQrCodeService qrCodeService;
 
-    public EventController(EventService eventService) {
+    public EventController(EventService eventService, EventQrCodeService qrCodeService) {
         this.eventService = eventService;
+        this.qrCodeService = qrCodeService;
     }
 
     @GetMapping
     public List<EventResponse> listEvents(@AuthenticationPrincipal PhotographerPrincipal photographer) {
         return eventService.listForPhotographer(photographer);
+    }
+
+    @GetMapping(value = "/{eventId}/qr-code.png", produces = MediaType.IMAGE_PNG_VALUE)
+    public ResponseEntity<byte[]> eventQrCode(
+            @PathVariable UUID eventId,
+            @AuthenticationPrincipal PhotographerPrincipal photographer
+    ) {
+        String token = eventService.guestAccessTokenForPhotographer(eventId, photographer);
+        byte[] image = qrCodeService.guestEntryQrCode(token);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"FrameBucket-event-" + eventId + "-QR.png\"")
+                .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+                .contentType(MediaType.IMAGE_PNG)
+                .body(image);
     }
 
     @GetMapping("/next-id")

@@ -276,6 +276,13 @@ public class EventService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public String guestAccessTokenForPhotographer(UUID eventId, PhotographerPrincipal photographer) {
+        return eventRepository.findByIdAndPhotographer_Id(eventId, photographer.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found."))
+                .getGuestAccessToken();
+    }
+
     private static CustomerEventResponse toCustomerEventResponse(EventBooking event) {
         String assigneeName = event.getTeamMemberAssignee() != null
                 ? event.getTeamMemberAssignee().getName()

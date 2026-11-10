@@ -126,6 +126,24 @@ async function downloadBlob(path, body, filename) {
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
+async function downloadAuthenticatedFile(path, filename) {
+  const response = await fetch(apiBase + path, { credentials: 'include' });
+  if (!response.ok) {
+    const responseText = await response.text();
+    let payload = null;
+    try { payload = responseText ? JSON.parse(responseText) : null; } catch { payload = { detail: responseText }; }
+    throw new Error(payload?.detail || payload?.message || `The download failed (HTTP ${response.status}).`);
+  }
+  const objectUrl = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
 export const api = {
   register: (form) => request('/api/auth/register', { method: 'POST', body: form }),
   plans: () => request('/api/subscriptions'),
@@ -137,6 +155,10 @@ export const api = {
   customer: (customerId) => request(`/api/customers/${encodeURIComponent(customerId)}`),
   registerCustomer: (form) => request('/api/customers', { method: 'POST', body: form }),
   events: () => request('/api/events'),
+  downloadEventQrCode: (eventId, eventCode) => downloadAuthenticatedFile(
+    `/api/events/${encodeURIComponent(eventId)}/qr-code.png`,
+    `FrameBucket-${String(eventCode || 'event').replace(/[^a-z0-9._-]+/gi, '-')}-QR.png`,
+  ),
   nextEventId: () => request('/api/events/next-id'),
   createEvent: (form) => request('/api/events', { method: 'POST', body: form }),
   assignEvent: (eventId, assigneeType, assigneeId) => request(`/api/events/${encodeURIComponent(eventId)}/assignee`, { method: 'PUT', body: { assigneeType, assigneeId } }),
@@ -163,6 +185,15 @@ export const api = {
   calculateQuote: (token, form) => request(`/api/public/enquiries/quote/${encodeURIComponent(token)}/calculate`, { method: 'POST', body: form }),
   submitQuote: (token, form) => request(`/api/public/enquiries/quote/${encodeURIComponent(token)}/submit`, { method: 'POST', body: form }),
   publicQuotePdfUrl: (token) => `${apiBase}/api/public/enquiries/quote/${encodeURIComponent(token)}/pdf`,
+  publicEventGallery: (token) => request(`/api/public/event-galleries/${encodeURIComponent(token)}`),
+  registerEventGuest: (token, form) => requestMultipart(
+    `/api/public/event-galleries/${encodeURIComponent(token)}/guests`,
+    form,
+  ),
+  deleteEventGuest: (token, guestId, deletionToken) => request(
+    `/api/public/event-galleries/${encodeURIComponent(token)}/guests`,
+    { method: 'DELETE', body: { guestId, deletionToken } },
+  ),
   requestCustomerOtp: (mobileNumber) => request('/api/customer-auth/request-code', { method: 'POST', body: { mobileNumber } }),
   verifyCustomerOtp: async (form) => {
     const profile = await request('/api/customer-auth/verify-code', { method: 'POST', body: form });

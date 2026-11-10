@@ -83,7 +83,8 @@ public class SecurityConfig {
                                 "/dashboard",
                                 "/customer-portal",
                                 "/quote/**",
-                                "/team-invite/**"
+                                "/team-invite/**",
+                                "/event-checkin/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/subscriptions").permitAll()

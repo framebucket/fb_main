@@ -2,6 +2,7 @@ package com.framebucket.event.repository;
 
 import com.framebucket.event.model.EventBooking;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,6 +18,9 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, UUID
     List<EventBooking> findAllByCustomer_IdInOrderByEventDateDesc(Collection<UUID> customerIds);
 
     java.util.Optional<EventBooking> findByIdAndPhotographer_Id(UUID eventId, UUID photographerId);
+
+    @EntityGraph(attributePaths = {"eventType", "photographer", "customer"})
+    java.util.Optional<EventBooking> findByGuestAccessToken(String guestAccessToken);
 
     java.util.Optional<EventBooking> findByIdAndCustomer_IdIn(UUID eventId, Collection<UUID> customerIds);
 

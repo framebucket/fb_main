@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
+import LocalFolderSync from './LocalFolderSync.jsx';
 
 function currentPath() {
   return window.location.pathname.replace(/\/+$/, '') || '/';
@@ -85,6 +86,11 @@ export default function App() {
   if (path.startsWith('/team-invite/')) {
     const token = path.split('/')[2] || '';
     return <TeamInvitePage token={token} />;
+  }
+
+  if (path.startsWith('/event-checkin/')) {
+    const token = path.split('/')[2] || '';
+    return <EventGuestCheckinPage token={token} />;
   }
 
   if (path === '/register') {
@@ -800,6 +806,118 @@ function VerifyEmailPage({ navigate }) {
       ) : null}
       <p className="auth-switch">Already confirmed? <button onClick={() => navigate('/login')}>Go to sign in</button></p>
     </AuthLayout>
+  );
+}
+
+function EventGuestCheckinPage({ token }) {
+  const [event, setEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ name: '', mobileNumber: '', faceConsent: false, whatsappConsent: false });
+  const [selfie, setSelfie] = useState(null);
+  const selfieInputRef = useRef(null);
+  const [submitted, setSubmitted] = useState(null);
+  const [deleted, setDeleted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setEvent(null);
+    setError('');
+    setSubmitted(null);
+    setDeleted(false);
+    api.publicEventGallery(token)
+      .then((context) => { if (!cancelled) setEvent(context); })
+      .catch((requestError) => { if (!cancelled) setError(requestError.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [token]);
+
+  async function submit(eventSubmit) {
+    eventSubmit.preventDefault();
+    setError('');
+    if (!selfie) {
+      setError('Choose a clear selfie to continue.');
+      return;
+    }
+    const payload = new FormData();
+    payload.append('name', form.name.trim());
+    payload.append('mobileNumber', form.mobileNumber.trim());
+    payload.append('faceConsent', String(form.faceConsent));
+    payload.append('whatsappConsent', String(form.whatsappConsent));
+    payload.append('selfie', selfie, selfie.name);
+    setBusy(true);
+    try {
+      const result = await api.registerEventGuest(token, payload);
+      setSubmitted(result);
+      setDeleted(false);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeFaceProfile() {
+    if (!submitted?.guestId || !submitted?.deletionToken) return;
+    if (!window.confirm('Remove your event face profile? This stops future matching. Photos already delivered to WhatsApp cannot be recalled.')) return;
+    setError('');
+    setBusy(true);
+    try {
+      await api.deleteEventGuest(token, submitted.guestId, submitted.deletionToken);
+      setSubmitted(null);
+      setDeleted(true);
+      setForm({ name: '', mobileNumber: '', faceConsent: false, whatsappConsent: false });
+      setSelfie(null);
+      if (selfieInputRef.current) selfieInputRef.current.value = '';
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const eventDate = event?.eventDate ? new Date(`${event.eventDate}T00:00:00`).toLocaleDateString() : '';
+
+  return (
+    <main className="guest-checkin-shell">
+      <header className="guest-checkin-header"><Brand /></header>
+      <section className="guest-checkin-card" aria-labelledby="guest-checkin-title">
+        <p className="eyebrow">FRAMEBUCKET · EVENT PHOTOS</p>
+        {loading ? <p className="customer-empty">Loading event…</p> : error && !event ? (
+          <div><h1 id="guest-checkin-title">This link is unavailable.</h1><p className="guest-checkin-copy">Ask the photographer for the event QR code again.</p></div>
+        ) : submitted ? (
+          <div className="guest-checkin-result">
+            <span className="guest-checkin-mark" aria-hidden="true">✓</span>
+            <h1 id="guest-checkin-title">You're on the list.</h1>
+            <p>{submitted.message}</p>
+            {submitted.photosMatched > 0 && <p className="guest-checkin-match-count">{submitted.photosMatched} matching photo{submitted.photosMatched === 1 ? '' : 's'} found · {submitted.photosQueued} queued for WhatsApp.</p>}
+            <p className="guest-checkin-copy">You can remove your event face profile while this page is open. For privacy, this browser does not save the removal key. If you need to remove it later, scan the QR again and register with the same WhatsApp number. Photos already sent to WhatsApp stay in your chat.</p>
+            {error && <p className="form-error" role="alert">{error}</p>}
+            <button className="button button-quiet button-full" type="button" onClick={removeFaceProfile} disabled={busy}>{busy ? 'Removing…' : 'Remove my face profile'}</button>
+          </div>
+        ) : (
+          <>
+            <h1 id="guest-checkin-title">Find your event <em>photos.</em></h1>
+            <p className="guest-checkin-copy">{event?.eventName}{eventDate ? ` · ${eventDate}` : ''}{event?.photographerName ? ` · ${event.photographerName}` : ''}</p>
+            {deleted && <p className="form-success" role="status">Your face profile has been removed.</p>}
+            <p className="guest-checkin-copy">Share your name, WhatsApp number, and a clear selfie. FrameBucket compares the selfie only with photos from this event. The selfie itself is discarded after its face template is created.</p>
+            {error && <p className="form-error" role="alert">{error}</p>}
+            <form className="auth-form guest-checkin-form" onSubmit={submit}>
+              <label>Your name<input value={form.name} onChange={(changeEvent) => setForm((current) => ({ ...current, name: changeEvent.target.value }))} autoComplete="name" maxLength="120" required placeholder="Name" /></label>
+              <label>WhatsApp number<input value={form.mobileNumber} onChange={(changeEvent) => setForm((current) => ({ ...current, mobileNumber: changeEvent.target.value }))} type="tel" autoComplete="tel" pattern="([0-9]{10}|\\+91[0-9]{10})" maxLength="13" required placeholder="9876543210" /><span className="field-hint">Enter 10 digits. You may also include +91.</span></label>
+              <label className="guest-selfie-label">Selfie<input ref={selfieInputRef} type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" capture="user" onChange={(changeEvent) => setSelfie(changeEvent.target.files?.[0] || null)} required /><span className="field-hint">JPG or PNG · maximum 8 MB · one face, facing the camera</span>{selfie && <span className="guest-selfie-name">{selfie.name}</span>}</label>
+              <label className="guest-consent"><input type="checkbox" checked={form.faceConsent} onChange={(changeEvent) => setForm((current) => ({ ...current, faceConsent: changeEvent.target.checked }))} required /><span>I consent to automated face matching for photos from this event. My face template is used only for this event and can be removed from this page.</span></label>
+              <label className="guest-consent"><input type="checkbox" checked={form.whatsappConsent} onChange={(changeEvent) => setForm((current) => ({ ...current, whatsappConsent: changeEvent.target.checked }))} required /><span>I agree to receive my matched event photos at this WhatsApp number.</span></label>
+              <button className="button button-dark button-full" type="submit" disabled={busy}>{busy ? 'Finding your photos…' : 'Upload selfie & find my photos'}</button>
+              <p className="form-footnote">Your face template is stored for this event until you remove it. Matched photos are sent using FrameBucket’s WhatsApp account.</p>
+            </form>
+          </>
+        )}
+      </section>
+      <footer className="guest-checkin-footer">© {new Date().getFullYear()} FrameBucket</footer>
+    </main>
   );
 }
 
@@ -1827,6 +1945,7 @@ function EventPanel({ user, onOpenGallery }) {
   const [showRegistration, setShowRegistration] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [updatingAssigneeId, setUpdatingAssigneeId] = useState('');
+  const [downloadingQrId, setDownloadingQrId] = useState('');
   const [assigneeSelections, setAssigneeSelections] = useState({});
 
   useEffect(() => {
@@ -1908,6 +2027,18 @@ function EventPanel({ user, onOpenGallery }) {
     }
   }
 
+  async function downloadEventQr(event) {
+    setError('');
+    setDownloadingQrId(event.id);
+    try {
+      await api.downloadEventQrCode(event.id, event.eventCode);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setDownloadingQrId('');
+    }
+  }
+
   const firstName = user.fullName.split(' ')[0];
 
   return (
@@ -1946,6 +2077,7 @@ function EventPanel({ user, onOpenGallery }) {
               <thead>
                 <tr>
                   <th scope="col">Event ID</th>
+                  <th scope="col">QR Code</th>
                   <th scope="col">Event Date</th>
                   <th scope="col">Event Type</th>
                   <th scope="col">Price</th>
@@ -1961,6 +2093,7 @@ function EventPanel({ user, onOpenGallery }) {
                 {events.map((event) => (
                   <tr key={event.id}>
                     <th scope="row"><span className="event-code">{event.eventCode}</span></th>
+                    <td><button className="button button-dark button-small event-qr-download" type="button" disabled={downloadingQrId === event.id} onClick={() => downloadEventQr(event)}>{downloadingQrId === event.id ? 'Preparing…' : 'Download'}</button></td>
                     <td>{new Date(`${event.eventDate}T00:00:00`).toLocaleDateString()}</td>
                     <td>{event.eventTypeName}</td>
                     <td>{event.enquiryId
@@ -2850,6 +2983,7 @@ function DataPanel({ initialEventId = '' }) {
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [loadingGallery, setLoadingGallery] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [localSyncRunning, setLocalSyncRunning] = useState(false);
   const [newFolder, setNewFolder] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -2953,28 +3087,46 @@ function DataPanel({ initialEventId = '' }) {
         <>
           <div className="gallery-toolbar">
             <label className="gallery-field">Event
-              <select value={eventId} onChange={(changeEvent) => { setEventId(changeEvent.target.value); setFolderId('root'); }}>
+              <select value={eventId} onChange={(changeEvent) => { setEventId(changeEvent.target.value); setFolderId('root'); }} disabled={busy || localSyncRunning}>
                 {events.map((event) => <option key={event.id} value={event.id}>{event.eventCode} · {event.customerName}</option>)}
               </select>
             </label>
             <label className="gallery-field">Folder
-              <select value={folderId} onChange={(changeEvent) => setFolderId(changeEvent.target.value)}>
+              <select value={folderId} onChange={(changeEvent) => setFolderId(changeEvent.target.value)} disabled={busy || localSyncRunning}>
                 {folders.map((folder) => <option key={folder.folder_id} value={folder.folder_id}>{folder.name}</option>)}
                 {folders.length === 0 && <option value="root">Gallery</option>}
               </select>
             </label>
             <form className="gallery-create-folder" onSubmit={addFolder}>
               <label className="gallery-field">New folder
-                <input value={newFolder} onChange={(changeEvent) => setNewFolder(changeEvent.target.value)} maxLength="80" placeholder="For example: Ceremony" />
+                <input value={newFolder} onChange={(changeEvent) => setNewFolder(changeEvent.target.value)} maxLength="80" placeholder="For example: Ceremony" disabled={busy || localSyncRunning} />
               </label>
-              <button className="button button-quiet" type="submit" disabled={busy || !newFolder.trim()}>＋ Add folder</button>
+              <button className="button button-quiet" type="submit" disabled={busy || localSyncRunning || !newFolder.trim()}>＋ Add folder</button>
             </form>
-            <label className={`button button-dark gallery-upload ${busy ? 'is-busy' : ''}`}>
-              {busy ? 'Uploading…' : '＋ Upload photos / videos'}
-              <input type="file" multiple accept="image/*,.arw,.cr2,.cr3,.dng,.nef,.orf,.raf,.rw2,video/mp4,video/quicktime,video/webm,.avi,.m4v" onChange={uploadFiles} disabled={busy || !selectedEvent} />
+            <label className={`button button-dark gallery-upload ${busy || localSyncRunning ? 'is-busy' : ''}`}>
+              {busy ? 'Uploading…' : localSyncRunning ? 'Auto-sync active' : '＋ Upload photos / videos'}
+              <input type="file" multiple accept="image/*,.arw,.cr2,.cr3,.dng,.nef,.orf,.raf,.rw2,video/mp4,video/quicktime,video/webm,.avi,.m4v" onChange={uploadFiles} disabled={busy || localSyncRunning || !selectedEvent} />
             </label>
           </div>
           {selectedEvent && <p className="gallery-event-note"><b>{selectedEvent.eventCode}</b> · {selectedEvent.customerName} · Folder: {folders.find((folder) => folder.folder_id === folderId)?.name || 'Gallery'}</p>}
+          <LocalFolderSync
+            eventId={eventId}
+            baseFolderId={folderId}
+            baseFolderName={folders.find((folder) => folder.folder_id === folderId)?.name || 'Gallery'}
+            folders={folders}
+            disabled={!selectedEvent || loadingGallery || busy}
+            onRunningChange={setLocalSyncRunning}
+            onFoldersChange={setFolders}
+            onUploaded={async (uploadedFolderId) => {
+              if (uploadedFolderId !== folderId) return;
+              try {
+                const response = await api.photographerMedia(eventId, folderId);
+                setMedia(response.photos || []);
+              } catch {
+                // The next normal gallery refresh will show the uploaded media.
+              }
+            }}
+          />
           {loadingGallery ? <p className="customer-empty">Loading gallery…</p> : media.length === 0 ? (
             <div className="gallery-empty"><span aria-hidden="true">✦</span><h3>This folder is ready.</h3><p>Upload images or videos to begin building the customer gallery.</p></div>
           ) : (
