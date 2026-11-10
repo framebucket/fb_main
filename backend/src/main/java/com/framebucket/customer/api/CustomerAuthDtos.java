@@ -37,7 +37,8 @@ public final class CustomerAuthDtos {
             String locationMapUrl,
             String locationLandmark,
             String locationNotes,
-            java.time.Instant locationUpdatedAt
+            java.time.Instant locationUpdatedAt,
+            boolean albumSubmitted
     ) {
     }
 }

@@ -13,6 +13,7 @@ import com.framebucket.event.api.EventDtos.AssigneeUpdateRequest;
 import com.framebucket.event.api.EventDtos.CustomerLocationUpdateRequest;
 import com.framebucket.event.model.EventBooking;
 import com.framebucket.event.model.EventType;
+import com.framebucket.gallery.DataGalleryService;
 import com.framebucket.event.repository.EventBookingRepository;
 import com.framebucket.event.repository.EventTypeRepository;
 import com.framebucket.event.notification.EventAssignmentNotice;
@@ -54,6 +55,7 @@ public class EventService {
     private final TeamMemberRepository teamMemberRepository;
     private final FreelancerRepository freelancerRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final DataGalleryService dataGalleryService;
 
     public EventService(
             EventBookingRepository eventRepository,
@@ -64,7 +66,8 @@ public class EventService {
             SubIdService subIdService,
             TeamMemberRepository teamMemberRepository,
             FreelancerRepository freelancerRepository,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            DataGalleryService dataGalleryService
     ) {
         this.eventRepository = eventRepository;
         this.eventTypeRepository = eventTypeRepository;
@@ -75,6 +78,7 @@ public class EventService {
         this.teamMemberRepository = teamMemberRepository;
         this.freelancerRepository = freelancerRepository;
         this.eventPublisher = eventPublisher;
+        this.dataGalleryService = dataGalleryService;
     }
 
     @Transactional(readOnly = true)
@@ -165,6 +169,7 @@ public class EventService {
                 customer
         ));
         customer.recordEventBooking();
+        dataGalleryService.provisionBestEffort(event);
         return toResponse(event, null);
     }
 
@@ -266,7 +271,8 @@ public class EventService {
                 event.getLocationMapUrl(),
                 event.getLocationLandmark(),
                 event.getLocationNotes(),
-                event.getLocationUpdatedAt()
+                event.getLocationUpdatedAt(),
+                event.getEventGallery()
         );
     }
 
@@ -280,7 +286,8 @@ public class EventService {
         return new CustomerEventResponse(
                 event.getId(), event.getEventType().getName(), photographerName, event.getEventDate(), event.getEventTime(), "Booked",
                 assigneeName, event.getLocationName(), event.getLocationMapUrl(), event.getLocationLandmark(),
-                event.getLocationNotes(), event.getLocationUpdatedAt()
+                event.getLocationNotes(), event.getLocationUpdatedAt(),
+                event.getEventGallery() != null && !event.getEventGallery().isBlank()
         );
     }
 

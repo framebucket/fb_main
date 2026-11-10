@@ -67,7 +67,8 @@ public final class EventDtos {
             String locationMapUrl,
             String locationLandmark,
             String locationNotes,
-            Instant locationUpdatedAt
+            Instant locationUpdatedAt,
+            String eventGallery
     ) {
     }
 }

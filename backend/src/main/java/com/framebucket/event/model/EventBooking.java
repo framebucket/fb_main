@@ -78,6 +78,9 @@ public class EventBooking {
     @Column(name = "location_updated_at")
     private Instant locationUpdatedAt;
 
+    @Column(name = "event_gallery", columnDefinition = "TEXT")
+    private String eventGallery;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -151,6 +154,10 @@ public class EventBooking {
     public String getLocationNotes() { return locationNotes; }
 
     public Instant getLocationUpdatedAt() { return locationUpdatedAt; }
+
+    public String getEventGallery() { return eventGallery; }
+
+    public void setEventGallery(String eventGallery) { this.eventGallery = eventGallery; }
 
     public void assign(TeamMember teamMember, Freelancer freelancer) {
         this.teamMemberAssignee = teamMember;

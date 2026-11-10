@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 
 function currentPath() {
@@ -826,10 +826,39 @@ function AuthLayout({ eyebrow, title, subtitle, children }) {
 
 function Dashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [dataEventId, setDataEventId] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileMenuRef = useRef(null);
+  const profileHeadingRef = useRef(null);
   const firstName = user.fullName.split(' ')[0];
   const dataModuleEnabled = user.dataModuleEnabled === true;
+
+  useEffect(() => {
+    if (!profileOpen) return undefined;
+    profileHeadingRef.current?.focus();
+
+    function closeFromOutside(event) {
+      if (!profileMenuRef.current?.contains(event.target)) {
+        setProfileOpen(false);
+      }
+    }
+
+    function closeOnEscape(event) {
+      if (event.key === 'Escape') {
+        setProfileOpen(false);
+        profileMenuRef.current?.querySelector('button')?.focus();
+      }
+    }
+
+    window.addEventListener('pointerdown', closeFromOutside);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      window.removeEventListener('pointerdown', closeFromOutside);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [profileOpen]);
 
   async function logout() {
     setError('');
@@ -848,8 +877,38 @@ function Dashboard({ user, onLogout }) {
       <header className="dashboard-header">
         <Brand />
         <div className="account-menu">
-          <span className="account-avatar">{firstName.slice(0, 1).toUpperCase()}</span>
-          <span className="account-name">{user.fullName}</span>
+          <div className="photographer-profile" ref={profileMenuRef}>
+            <button
+              className="photographer-profile-trigger"
+              type="button"
+              aria-expanded={profileOpen}
+              aria-haspopup="dialog"
+              aria-controls="photographer-profile-popover"
+              aria-label="Show photographer profile"
+              onClick={() => setProfileOpen((open) => !open)}
+            >
+              <span className="account-avatar" aria-hidden="true">{firstName.slice(0, 1).toUpperCase()}</span>
+              <span className="account-name">{user.fullName}</span>
+              <span className="profile-menu-chevron" aria-hidden="true">⌄</span>
+            </button>
+            {profileOpen && (
+              <section
+                className="photographer-profile-popover"
+                id="photographer-profile-popover"
+                role="dialog"
+                aria-labelledby="photographer-profile-title"
+              >
+                <p className="photographer-profile-kicker">ACCOUNT DETAILS</p>
+                <h2 id="photographer-profile-title" ref={profileHeadingRef} tabIndex={-1}>Photographer profile</h2>
+                <dl className="photographer-profile-details">
+                  <div><dt>Photographer ID</dt><dd className="photographer-profile-id">{user.id || 'Unavailable'}</dd></div>
+                  <div><dt>Name</dt><dd>{user.fullName || 'Unavailable'}</dd></div>
+                  <div><dt>Email</dt><dd>{user.email || 'Unavailable'}</dd></div>
+                  <div><dt>Mobile number</dt><dd>{user.mobileNumber || 'Unavailable'}</dd></div>
+                </dl>
+              </section>
+            )}
+          </div>
           <button className="button button-quiet button-small" onClick={logout} disabled={busy}>{busy ? 'Signing out…' : 'Sign out'}</button>
         </div>
       </header>
@@ -886,7 +945,7 @@ function Dashboard({ user, onLogout }) {
         </button>
       </nav>
       <p className="workflow-sequence">Photography workflow <b>Enquiries</b><span>→</span><b>Customers</b><span>→</span><b>Events</b><span>→</span><b>Team</b><span>→</span><b>Data</b></p>
-      {activeTab === 'overview' ? <DashboardOverview user={user} /> : activeTab === 'enquiries' ? <EnquiryPanel user={user} /> : activeTab === 'customers' ? <CustomerPanel user={user} /> : activeTab === 'events' ? <EventPanel user={user} /> : activeTab === 'team' ? <TeamPanel user={user} /> : <DataPanel />}
+      {activeTab === 'overview' ? <DashboardOverview user={user} /> : activeTab === 'enquiries' ? <EnquiryPanel user={user} /> : activeTab === 'customers' ? <CustomerPanel user={user} /> : activeTab === 'events' ? <EventPanel user={user} onOpenGallery={(event) => { setDataEventId(event.id); setActiveTab('data'); }} /> : activeTab === 'team' ? <TeamPanel user={user} /> : <DataPanel initialEventId={dataEventId} />}
       <footer className="dashboard-footer"><Brand /><span>Your growth counts.</span><span>© 2026 FrameBucket</span></footer>
     </main>
   );
@@ -1755,7 +1814,7 @@ function getCalendarCells(month) {
   return cells;
 }
 
-function EventPanel({ user }) {
+function EventPanel({ user, onOpenGallery }) {
   const [events, setEvents] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
@@ -1894,6 +1953,7 @@ function EventPanel({ user }) {
                   <th scope="col">Assignee</th>
                   <th scope="col">Event Time</th>
                   <th scope="col">Location</th>
+                  <th scope="col">Album Design Link</th>
                   <th scope="col">Creation Date</th>
                 </tr>
               </thead>
@@ -1917,6 +1977,10 @@ function EventPanel({ user }) {
                       {event.locationLandmark && <small>Landmark: {event.locationLandmark}</small>}
                       {event.locationNotes && <small>{event.locationNotes}</small>}
                     </div> : <span className="event-location-missing">Not provided</span>}</td>
+                    <td className="album-link-cell">
+                      <button className="button button-dark button-small event-gallery-button" type="button" disabled={!user.dataModuleEnabled} title={user.dataModuleEnabled ? 'Open this event gallery' : 'The Data module is not included with Bronze.'} onClick={() => onOpenGallery(event)}>Gallery</button>
+                      {event.eventGallery && <a className="album-design-link" href={event.eventGallery} target="_blank" rel="noreferrer">Designer folder ↗</a>}
+                    </td>
                     <td>{new Date(event.createdAt).toLocaleString()}</td>
                   </tr>
                 ))}
@@ -2355,6 +2419,7 @@ function CustomerPortalPage({ customer, onLogout }) {
   const [signingOut, setSigningOut] = useState(false);
   const [locationEvent, setLocationEvent] = useState(null);
   const [locationBusy, setLocationBusy] = useState(false);
+  const [galleryEvent, setGalleryEvent] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -2434,7 +2499,7 @@ function CustomerPortalPage({ customer, onLogout }) {
         ) : (
           <div className="customer-table-scroll">
             <table className="customer-table customer-event-table">
-              <thead><tr><th scope="col">Event</th><th scope="col">Photographer</th><th scope="col">Event date</th><th scope="col">Time</th><th scope="col">Status</th><th scope="col">Assignee</th><th scope="col">Location</th></tr></thead>
+              <thead><tr><th scope="col">Event</th><th scope="col">Photographer</th><th scope="col">Event date</th><th scope="col">Time</th><th scope="col">Status</th><th scope="col">Assignee</th><th scope="col">Location</th><th scope="col">Photo Gallery</th></tr></thead>
               <tbody>
                 {events.map((event, index) => (
                   <tr key={event.eventId || `${event.eventName}-${event.eventDate}-${index}`}>
@@ -2451,6 +2516,7 @@ function CustomerPortalPage({ customer, onLogout }) {
                       {event.locationLandmark && <small>Landmark: {event.locationLandmark}</small>}
                       <button className="customer-id-link" type="button" onClick={() => setLocationEvent(event)}>{event.locationName ? 'Update location' : 'Add location details'}</button>
                     </div></td>
+                    <td><button className="button button-dark button-small event-gallery-button" type="button" onClick={() => setGalleryEvent(event)}>{event.albumSubmitted ? 'View gallery · sent' : 'Open gallery'}</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -2459,8 +2525,84 @@ function CustomerPortalPage({ customer, onLogout }) {
         )}
       </section>
       {locationEvent && <CustomerLocationModal event={locationEvent} busy={locationBusy} error={error} onClose={() => { if (!locationBusy) { setLocationEvent(null); setError(''); } }} onSave={saveLocation} />}
+      {galleryEvent && <CustomerGalleryModal event={galleryEvent} onClose={() => setGalleryEvent(null)} onSubmitted={() => {
+        setGalleryEvent(null);
+        setEvents((current) => current.map((event) => event.eventId === galleryEvent.eventId ? { ...event, albumSubmitted: true } : event));
+        setNotice(`Your selection for ${galleryEvent.eventName} was sent to your photographer.`);
+      }} />}
       <footer className="customer-portal-footer"><Brand /><span>© 2026 FrameBucket</span></footer>
     </main>
+  );
+}
+
+function CustomerGalleryModal({ event, onClose, onSubmitted }) {
+  const [media, setMedia] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    api.customerMedia(event.eventId)
+      .then((response) => { if (!cancelled) setMedia(response.photos || []); })
+      .catch((requestError) => { if (!cancelled) setError(requestError.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [event.eventId]);
+
+  async function submitSelection() {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await api.submitAlbum(event.eventId, selectedIds);
+      onSubmitted(result);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function togglePhoto(photoId) {
+    setSelectedIds((current) => current.includes(photoId)
+      ? current.filter((id) => id !== photoId)
+      : [...current, photoId]);
+  }
+
+  return (
+    <div className="modal-backdrop gallery-modal-backdrop" role="presentation" onMouseDown={(clickEvent) => { if (clickEvent.target === clickEvent.currentTarget && !busy) onClose(); }}>
+      <section className="gallery-modal" role="dialog" aria-modal="true" aria-labelledby="customer-gallery-title">
+        <div className="modal-heading"><div><p className="eyebrow">YOUR EVENT PHOTOS</p><h2 id="customer-gallery-title">{event.eventName} gallery</h2></div><button className="modal-close" type="button" onClick={onClose} disabled={busy} aria-label="Close gallery">×</button></div>
+        <p className="gallery-modal-note">{event.albumSubmitted ? 'Your selection has been sent to your photographer. You can still view this gallery here.' : 'Choose the photos you would like your photographer to prepare for album design. Videos are available to view but cannot be selected for an album.'}</p>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        {notice && <p className="form-success" role="status">{notice}</p>}
+        {loading ? <p className="customer-empty">Loading event gallery…</p> : media.length === 0 ? (
+          <div className="gallery-empty"><span aria-hidden="true">✦</span><h3>Your photographer is preparing this gallery.</h3><p>Check back once the processed event photos are ready.</p></div>
+        ) : (
+          <div className="gallery-grid customer-gallery-grid">
+            {media.map((item) => {
+              const selected = selectedIds.includes(item.photo_id);
+              return (
+                <article className={`gallery-card customer-gallery-card ${selected ? 'is-selected' : ''}`} key={item.photo_id}>
+                  <div className="gallery-card-preview">
+                    {item.media_type === 'video'
+                      ? <video src={api.customerPreviewUrl(event.eventId, item.photo_id)} controls preload="metadata" aria-label={item.original_filename} />
+                      : <img src={api.customerPreviewUrl(event.eventId, item.photo_id)} alt={item.original_filename} loading="lazy" />}
+                    <span className="gallery-photo-number">{item.media_type === 'video' ? 'VIDEO' : `#${item.photo_number}`}</span>
+                  </div>
+                  <div className="gallery-card-copy"><b title={item.original_filename}>{item.original_filename}</b><span>{item.media_type === 'video' ? 'Video preview' : 'Processed photo'}</span></div>
+                  {item.media_type !== 'video' && !event.albumSubmitted && <label className="gallery-select-photo"><input type="checkbox" checked={selected} onChange={() => togglePhoto(item.photo_id)} disabled={busy} /> Select for album design</label>}
+                </article>
+              );
+            })}
+          </div>
+        )}
+        <div className="gallery-modal-actions"><span>{event.albumSubmitted ? 'Selection already sent' : `${selectedIds.length} photos selected`}</span><button className="button button-quiet" type="button" onClick={onClose} disabled={busy}>Close</button>{!event.albumSubmitted && <button className="button button-dark" type="button" onClick={submitSelection} disabled={busy || loading || selectedIds.length === 0}>{busy ? 'Sending selection…' : 'Submit for album design ↗'}</button>}</div>
+      </section>
+    </div>
   );
 }
 
@@ -2544,22 +2686,160 @@ function CustomerLocationModal({ event, busy, error, onClose, onSave }) {
   );
 }
 
-function DataPanel() {
+function DataPanel({ initialEventId = '' }) {
+  const [events, setEvents] = useState([]);
+  const [eventId, setEventId] = useState(initialEventId);
+  const [folders, setFolders] = useState([]);
+  const [folderId, setFolderId] = useState('root');
+  const [media, setMedia] = useState([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [loadingGallery, setLoadingGallery] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [newFolder, setNewFolder] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    api.events()
+      .then((loadedEvents) => {
+        if (cancelled) return;
+        setEvents(loadedEvents);
+        setEventId((current) => loadedEvents.some((event) => event.id === initialEventId)
+          ? initialEventId
+          : loadedEvents.some((event) => event.id === current) ? current : loadedEvents[0]?.id || '');
+      })
+      .catch((requestError) => { if (!cancelled) setError(requestError.message); })
+      .finally(() => { if (!cancelled) setLoadingEvents(false); });
+    return () => { cancelled = true; };
+  }, [initialEventId]);
+
+  useEffect(() => {
+    if (!eventId) {
+      setFolders([]);
+      setMedia([]);
+      return undefined;
+    }
+    let cancelled = false;
+    setLoadingGallery(true);
+    setError('');
+    Promise.all([api.dataFolders(eventId), api.photographerMedia(eventId, folderId)])
+      .then(([folderResponse, mediaResponse]) => {
+        if (cancelled) return;
+        const loadedFolders = folderResponse.folders || [];
+        setFolders(loadedFolders);
+        if (!loadedFolders.some((folder) => folder.folder_id === folderId)) setFolderId('root');
+        setMedia(mediaResponse.photos || []);
+      })
+      .catch((requestError) => { if (!cancelled) setError(requestError.message); })
+      .finally(() => { if (!cancelled) setLoadingGallery(false); });
+    return () => { cancelled = true; };
+  }, [eventId, folderId]);
+
+  async function addFolder(submitEvent) {
+    submitEvent.preventDefault();
+    if (!eventId || !newFolder.trim()) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const createdFolder = await api.createDataFolder(eventId, newFolder.trim());
+      setFolders((current) => [...current, createdFolder]);
+      setFolderId(createdFolder.folder_id);
+      setNewFolder('');
+      setNotice(`Folder “${createdFolder.name}” created.`);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadFiles(changeEvent) {
+    const files = Array.from(changeEvent.target.files || []);
+    if (!eventId || files.length === 0) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    let uploaded = 0;
+    try {
+      for (const file of files) {
+        await api.uploadDataFile(eventId, folderId, file);
+        uploaded += 1;
+      }
+      const response = await api.photographerMedia(eventId, folderId);
+      setMedia(response.photos || []);
+      setNotice(`${uploaded} ${uploaded === 1 ? 'file' : 'files'} uploaded. Originals are private to your photographer account.`);
+    } catch (requestError) {
+      setError(uploaded ? `${uploaded} file(s) uploaded; the next upload failed: ${requestError.message}` : requestError.message);
+      api.photographerMedia(eventId, folderId).then((response) => setMedia(response.photos || [])).catch(() => {});
+    } finally {
+      setBusy(false);
+      changeEvent.target.value = '';
+    }
+  }
+
+  const selectedEvent = events.find((event) => event.id === eventId);
   return (
-    <section className="module-panel data-panel">
-      <div className="panel-copy">
-        <p className="eyebrow">YOUR IMAGES, WITH A CLEAR NEXT STEP</p>
-        <h2>Every frame has<br /><em>a place to go.</em></h2>
-        <p>Upload event photos, prepare customer previews, collect album selections, and share finished work. The data tools will be added here.</p>
-        <button className="button button-dark" disabled title="Photo uploads will be added next">Photo tools are coming next <span aria-hidden="true">↗</span></button>
+    <section className="gallery-module" aria-labelledby="data-gallery-title">
+      <div className="gallery-intro">
+        <div>
+          <p className="eyebrow">PRIVATE ORIGINALS · CUSTOMER PREVIEWS</p>
+          <h2 id="data-gallery-title">Event <em>galleries.</em></h2>
+          <p>Upload images and videos, organize them into folders, and give customers access to processed previews. Original files stay private to your account.</p>
+        </div>
+        <span className="gallery-count">{media.length} {media.length === 1 ? 'ITEM' : 'ITEMS'}</span>
       </div>
-      <div className="upload-placeholder">
-        <div className="upload-mark">＋</div>
-        <b>Your collections will live here</b>
-        <span>RAW uploads · JPEG previews · Album selections</span>
-        <div className="upload-lines"><i /><i /><i /></div>
-        <small>DATA MODULE / PREVIEW</small>
-      </div>
+      {error && <p className="form-error customer-message" role="alert">{error}</p>}
+      {notice && <p className="form-success customer-message" role="status">{notice}</p>}
+      {loadingEvents ? <p className="customer-empty">Loading your events…</p> : events.length === 0 ? (
+        <div className="customer-empty-state"><div className="upload-mark">＋</div><h4>Create an event to start a gallery.</h4><p>Each event gets its own customer gallery and private photographer storage.</p></div>
+      ) : (
+        <>
+          <div className="gallery-toolbar">
+            <label className="gallery-field">Event
+              <select value={eventId} onChange={(changeEvent) => { setEventId(changeEvent.target.value); setFolderId('root'); }}>
+                {events.map((event) => <option key={event.id} value={event.id}>{event.eventCode} · {event.customerName}</option>)}
+              </select>
+            </label>
+            <label className="gallery-field">Folder
+              <select value={folderId} onChange={(changeEvent) => setFolderId(changeEvent.target.value)}>
+                {folders.map((folder) => <option key={folder.folder_id} value={folder.folder_id}>{folder.name}</option>)}
+                {folders.length === 0 && <option value="root">Gallery</option>}
+              </select>
+            </label>
+            <form className="gallery-create-folder" onSubmit={addFolder}>
+              <label className="gallery-field">New folder
+                <input value={newFolder} onChange={(changeEvent) => setNewFolder(changeEvent.target.value)} maxLength="80" placeholder="For example: Ceremony" />
+              </label>
+              <button className="button button-quiet" type="submit" disabled={busy || !newFolder.trim()}>＋ Add folder</button>
+            </form>
+            <label className={`button button-dark gallery-upload ${busy ? 'is-busy' : ''}`}>
+              {busy ? 'Uploading…' : '＋ Upload photos / videos'}
+              <input type="file" multiple accept="image/*,.arw,.cr2,.cr3,.dng,.nef,.orf,.raf,.rw2,video/mp4,video/quicktime,video/webm,.avi,.m4v" onChange={uploadFiles} disabled={busy || !selectedEvent} />
+            </label>
+          </div>
+          {selectedEvent && <p className="gallery-event-note"><b>{selectedEvent.eventCode}</b> · {selectedEvent.customerName} · Folder: {folders.find((folder) => folder.folder_id === folderId)?.name || 'Gallery'}</p>}
+          {loadingGallery ? <p className="customer-empty">Loading gallery…</p> : media.length === 0 ? (
+            <div className="gallery-empty"><span aria-hidden="true">✦</span><h3>This folder is ready.</h3><p>Upload images or videos to begin building the customer gallery.</p></div>
+          ) : (
+            <div className="gallery-grid">
+              {media.map((item) => (
+                <article className="gallery-card" key={item.photo_id}>
+                  <div className="gallery-card-preview">
+                    {item.media_type === 'video'
+                      ? <video src={api.photographerPreviewUrl(eventId, item.photo_id)} controls preload="metadata" aria-label={item.original_filename} />
+                      : <img src={api.photographerPreviewUrl(eventId, item.photo_id)} alt={item.original_filename} loading="lazy" />}
+                    <span className="gallery-photo-number">{item.media_type === 'video' ? 'VIDEO' : `#${item.photo_number}`}</span>
+                  </div>
+                  <div className="gallery-card-copy"><b title={item.original_filename}>{item.original_filename}</b><span>{item.media_type === 'video' ? 'Customer video' : `${item.width || '—'} × ${item.height || '—'} · processed preview`}</span></div>
+                  <a className="gallery-original-link" href={api.photographerOriginalUrl(eventId, item.photo_id)}>Download original ↗</a>
+                </article>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </section>
   );
 }

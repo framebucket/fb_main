@@ -61,6 +61,27 @@ async function request(path, options = {}) {
   return payload;
 }
 
+async function requestMultipart(path, body) {
+  if (!csrfToken) {
+    await loadCsrfToken();
+  }
+  const response = await fetch(apiBase + path, {
+    method: 'POST',
+    headers: { 'X-XSRF-TOKEN': csrfToken },
+    credentials: 'include',
+    body,
+  });
+  const responseText = await response.text();
+  let payload = null;
+  if (responseText) {
+    try { payload = JSON.parse(responseText); } catch { payload = { detail: responseText }; }
+  }
+  if (!response.ok) {
+    throw new Error(payload?.detail || payload?.message || 'The upload could not be completed.');
+  }
+  return payload;
+}
+
 export const api = {
   register: (form) => request('/api/auth/register', { method: 'POST', body: form }),
   plans: () => request('/api/subscriptions'),
@@ -107,6 +128,19 @@ export const api = {
   },
   customerMe: () => request('/api/customer-auth/me'),
   customerEvents: () => request('/api/customer-portal/events'),
+  dataFolders: (eventId) => request(`/api/events/${encodeURIComponent(eventId)}/gallery/folders`),
+  createDataFolder: (eventId, name) => request(`/api/events/${encodeURIComponent(eventId)}/gallery/folders`, { method: 'POST', body: { name } }),
+  photographerMedia: (eventId, folderId) => request(`/api/events/${encodeURIComponent(eventId)}/gallery/media${folderId ? `?folderId=${encodeURIComponent(folderId)}` : ''}`),
+  uploadDataFile: (eventId, folderId, file) => {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return requestMultipart(`/api/events/${encodeURIComponent(eventId)}/gallery/media?folderId=${encodeURIComponent(folderId || 'root')}`, form);
+  },
+  customerMedia: (eventId) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/gallery/media`),
+  submitAlbum: (eventId, photoIds) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/gallery/album-submissions`, { method: 'POST', body: { photoIds } }),
+  photographerPreviewUrl: (eventId, mediaId) => `${apiBase}/api/events/${encodeURIComponent(eventId)}/gallery/media/${encodeURIComponent(mediaId)}/preview`,
+  photographerOriginalUrl: (eventId, mediaId) => `${apiBase}/api/events/${encodeURIComponent(eventId)}/gallery/media/${encodeURIComponent(mediaId)}/original`,
+  customerPreviewUrl: (eventId, mediaId) => `${apiBase}/api/customer-portal/events/${encodeURIComponent(eventId)}/gallery/media/${encodeURIComponent(mediaId)}/preview`,
   login: async (form) => {
     const profile = await request('/api/auth/login', { method: 'POST', body: form });
     csrfToken = null;
