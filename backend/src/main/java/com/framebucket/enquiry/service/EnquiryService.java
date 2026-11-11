@@ -324,8 +324,7 @@ public class EnquiryService {
                         quotation.getPreferredEventDate(),
                         quotation.getPreferredTime(),
                         selections,
-                        quotation.getAlbumSheets(),
-                        quotation.getCouponCode()
+                        quotation.getAlbumSheets()
                 ),
                 enquiry.getPhotographer().getId()
         );
@@ -335,8 +334,7 @@ public class EnquiryService {
                         quotation.getPreferredEventDate(),
                         quotation.getPreferredTime(),
                         selections,
-                        quotation.getAlbumSheets(),
-                        quotation.getCouponCode()
+                        quotation.getAlbumSheets()
                 ),
                 selectedEventTypes
         );
@@ -430,7 +428,6 @@ public class EnquiryService {
                 request.events().size(),
                 selectionsJson,
                 request.albumSheets(),
-                cleanCoupon(request.couponCode()),
                 finalPrice,
                 pdf
         ));
@@ -560,7 +557,4 @@ public class EnquiryService {
         return photographer.getStudioName() == null ? photographer.getFullName() : photographer.getStudioName();
     }
 
-    private static String cleanCoupon(String coupon) {
-        return coupon == null || coupon.isBlank() ? null : coupon.trim().toUpperCase(Locale.ROOT);
-    }
 }

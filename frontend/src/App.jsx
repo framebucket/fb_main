@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api } from './api.js';
+import HeroScene from './HeroScene.jsx';
+import { ThemeToggle, useTheme } from './theme.jsx';
 import LocalFolderSync from './LocalFolderSync.jsx';
 
 function currentPath() {
@@ -168,68 +170,118 @@ function Brand() {
 }
 
 function HomePage({ navigate }) {
+  const [theme] = useTheme();
+  const year = new Date().getFullYear();
   return (
-    <main className="landing-shell">
-      <header className="site-header">
-        <Brand />
-        <nav className="header-actions" aria-label="Main navigation">
-          <button className="button button-quiet" onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>Pricing</button>
-          <button className="button button-quiet" onClick={() => navigate('/login')}>Log in</button>
-          <button className="button button-dark button-small" onClick={() => navigate('/register')}>
-            Create account <span aria-hidden="true">↗</span>
-          </button>
-        </nav>
+    <main className="lp">
+      <header className="lp-header">
+        <div className="lp-wrap">
+          <Brand />
+          <nav className="lp-nav" aria-label="Main navigation">
+            <a className="lp-nav-link" href="#workflow">How it works</a>
+            <a className="lp-nav-link" href="#pricing">Pricing</a>
+            <button type="button" className="lp-nav-link" onClick={() => navigate('/login')}>Log in</button>
+            <ThemeToggle />
+            <button type="button" className="lp-button lp-button-primary lp-button-small" onClick={() => navigate('/register')}>Start free trial</button>
+          </nav>
+        </div>
       </header>
 
-      <section className="hero">
-        <div className="hero-copy">
-          <p className="eyebrow"><span className="eyebrow-dot" /> YOUR STUDIO, IN FOCUS</p>
-          <h1>More time behind the camera. <em>Less time chasing details.</em></h1>
-          <p className="hero-description">
-            Keep your client work moving from the first booking to the final album, all in one calm workspace.
-          </p>
-          <p className="hero-trial-offer">Register now to get a 7-day free trial.</p>
-          <div className="hero-actions">
-            <button className="button button-dark" onClick={() => navigate('/register')}>
-              Start your workspace <span aria-hidden="true">↗</span>
-            </button>
-            <button className="button button-quiet" onClick={() => navigate('/login')}>I already have an account</button>
+      <section className="lp-hero">
+        <div className="lp-wrap">
+          <div className="lp-hero-copy">
+            <h1><span>More time behind the camera.</span><em>Less time chasing details.</em></h1>
+            <p className="lp-hero-lede">
+              Enquiries, quotes, bookings, galleries and album selections for your studio, in one workspace your clients use too.
+            </p>
+            <div className="lp-hero-actions">
+              <button type="button" className="lp-button lp-button-primary" onClick={() => navigate('/register')}>Start your 7-day free trial</button>
+              <button type="button" className="lp-button lp-button-ghost" onClick={() => navigate('/login')}>Log in</button>
+            </div>
+            <p className="lp-hero-fine">Free for 7 days. Made for independent photographers and small studios.</p>
           </div>
-          <div className="hero-note">
-            <span className="note-line" />
-            Built for independent photographers and small studios
+          <div className="lp-hero-visual">
+            <HeroScene theme={theme} />
           </div>
-        </div>
-
-        <div className="hero-art" aria-label="A preview of the photographer workspace">
-          <div className="art-grain" />
-          <div className="art-topline"><span>STUDIO OVERVIEW</span><span>01 / 03</span></div>
-          <div className="art-heading">Good work,<br /><i>in progress.</i></div>
-          <div className="art-card art-card-customer">
-            <span className="art-card-icon">01</span>
-            <span><b>Customer stories</b><small>Bookings, people, and plans</small></span>
-            <span className="art-arrow">↗</span>
-          </div>
-          <div className="art-card art-card-data">
-            <span className="art-card-icon">02</span>
-            <span><b>Photo collections</b><small>Uploads, selections, and delivery</small></span>
-            <span className="art-arrow">↗</span>
-          </div>
-          <div className="art-stamp">YOUR<br />STUDIO<br />SPACE</div>
-          <div className="art-bottomline"><span>FRAMEBUCKET / FIELD NOTES</span><span>MADE FOR THE MOMENTS THAT MATTER</span></div>
         </div>
       </section>
 
-      <section className="feature-strip">
-        <div><span className="feature-number">01</span><span><b>One clear home</b><small>Your bookings and work, together.</small></span></div>
-        <div><span className="feature-number">02</span><span><b>Clients in the loop</b><small>Share progress as the story unfolds.</small></span></div>
-        <div><span className="feature-number">03</span><span><b>Made to grow</b><small>Start simple. Add tools as you need them.</small></span></div>
+      <section className="lp-section" id="workflow" aria-labelledby="workflow-title">
+        <div className="lp-wrap">
+          <div className="lp-section-head">
+            <h2 id="workflow-title">From first enquiry to final album</h2>
+            <p>Every job follows the same path. FrameBucket keeps each step, and each client, moving.</p>
+          </div>
+          <ol className="lp-flow">
+            <li><h3>Enquiry</h3><p>Log a lead and send a quote link on WhatsApp and email in one step.</p></li>
+            <li><h3>Quote</h3><p>Clients build their own estimate. You get the PDF and agree the final price.</p></li>
+            <li><h3>Booking</h3><p>Turn the quote into an event, block the date, and assign your team.</p></li>
+            <li><h3>Gallery</h3><p>Upload RAW and JPEG files from your laptop. Guests find their photos with a selfie.</p></li>
+            <li><h3>Album</h3><p>Clients pick their favourites. You receive the RAW files, zipped for design.</p></li>
+          </ol>
+        </div>
       </section>
+
+      <PlatformNumbers />
 
       <PricingSection navigate={navigate} />
 
-      <footer className="site-footer"><Brand /><span>Thoughtful tools for people who make memories.</span><span>© 2026 FrameBucket</span></footer>
+      <footer className="lp-footer">
+        <div className="lp-wrap"><Brand /><span>Thoughtful tools for people who make memories.</span><span>© {year} FrameBucket</span></div>
+      </footer>
     </main>
+  );
+}
+
+function PlatformNumbers() {
+  const [stats, setStats] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.publicStats()
+      .then((result) => { if (!cancelled) setStats(result); })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const count = (value) => Number(value || 0).toLocaleString('en-IN');
+  const today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  // Shown only once the platform passes its public-stats threshold.
+  if (failed || !stats || !stats.visible) return null;
+  return (
+    <section className="lp-section lp-numbers" aria-labelledby="numbers-title">
+      <div className="lp-wrap">
+      <div className="lp-section-head">
+        <h2 id="numbers-title">FrameBucket so far</h2>
+        <p>Studios using FrameBucket and the work they run through it, as of {today}.</p>
+      </div>
+      {(
+        <div className="hero-stats-grid">
+          <PieChartCard
+            title="Photographers & quotations"
+            description="Photographers who have joined, and quotations generated for their clients."
+            items={[
+              { label: 'Photographers joined', value: stats.photographers, color: '#d2b36b' },
+              { label: 'Quotations generated', value: stats.quotations, color: '#79613c' },
+            ]}
+            formatValue={count}
+            emptyMessage="The first numbers will appear here soon."
+          />
+          <PieChartCard
+            title="Customers & events"
+            description="Customers added and events created, till today."
+            items={[
+              { label: 'Customers added', value: stats.customers, color: '#ad8748' },
+              { label: 'Events created', value: stats.events, color: '#5d4a2e' },
+            ]}
+            formatValue={count}
+            emptyMessage="The first numbers will appear here soon."
+          />
+        </div>
+      )}
+      </div>
+    </section>
   );
 }
 
@@ -273,8 +325,7 @@ function PricingSection({ navigate }) {
     <section className="pricing-section" id="pricing">
       <div className="pricing-heading">
         <div>
-          <p className="eyebrow">SIMPLE PLANS FOR YOUR STUDIO</p>
-          <h2>Choose room to <em>grow.</em></h2>
+          <h2>Plans that grow with your studio</h2>
           <p>Every plan starts with a 7-day free trial. Prices are in INR, before GST.</p>
         </div>
         <div className="billing-picker" role="group" aria-label="Pricing period">
@@ -291,7 +342,6 @@ function PricingSection({ navigate }) {
               const selectedPrice = billing === 'YEARLY' ? plan.yearlyPrice : plan.monthlyPrice;
               return (
                 <article className="pricing-card" key={plan.id}>
-                  <p className="plan-code">{plan.code}</p>
                   <h3>{plan.name}</h3>
                   <p className="plan-description">{plan.description}</p>
                   <div className="plan-price">
@@ -309,7 +359,7 @@ function PricingSection({ navigate }) {
                     className="button button-dark button-full"
                     onClick={() => navigate(`/payment?planCode=${encodeURIComponent(plan.code)}&billing=${billing}`)}
                   >
-                    Select {plan.name.replace(' Plan', '')} <span aria-hidden="true">↗</span>
+                    Choose {plan.name.replace(' Plan', '')}
                   </button>
                 </article>
               );
@@ -416,10 +466,13 @@ function PaymentPage({ navigate }) {
     <main className="payment-shell">
       <header className="payment-header">
         <Brand />
-        <button className="button button-quiet" onClick={() => navigate('/')}>Back to pricing</button>
+        <div className="header-actions">
+          <ThemeToggle />
+          <button className="button button-quiet button-small" onClick={() => navigate('/')}>Back to pricing</button>
+        </div>
       </header>
       <section className="payment-content">
-        <p className="eyebrow">PAYMENT · PREVIEW</p>
+        <p className="eyebrow">Payment preview</p>
         <h1>Review your <em>plan.</em></h1>
         <p className="payment-intro">Choose a billing period and review the price, including 18% GST.</p>
         {loading && <p className="pricing-message">Loading plan details…</p>}
@@ -485,17 +538,17 @@ function RegisterPage({ navigate, onRegistered }) {
   }
 
   return (
-    <AuthLayout eyebrow="A GOOD PLACE TO BEGIN" title={<>Make room for<br /><em>the work you love.</em></>} subtitle="Create your photographer account and set up your studio workspace.">
+    <AuthLayout eyebrow="A good place to begin" title={<>Make room for<br /><em>the work you love.</em></>} subtitle="Create your photographer account and set up your studio workspace.">
       <form className="auth-form" onSubmit={submit}>
         <label>Full name<input name="fullName" value={form.fullName} onChange={update} autoComplete="name" required maxLength="120" placeholder="Your name" /></label>
-        <label>Studio name <span className="optional-label">OPTIONAL</span><input name="studioName" value={form.studioName} onChange={update} maxLength="160" placeholder="The name clients know" /></label>
+        <label>Studio name <span className="optional-label">Optional</span><input name="studioName" value={form.studioName} onChange={update} maxLength="160" placeholder="The name clients know" /></label>
         <label>Email address<input name="email" type="email" value={form.email} onChange={update} autoComplete="email" required maxLength="320" placeholder="you@yourstudio.com" /></label>
         <label>Mobile number<input name="mobileNumber" type="tel" value={form.mobileNumber} onChange={update} autoComplete="tel" required maxLength="13" pattern="([0-9]{10}|\+91[0-9]{10})" placeholder="9876543210" aria-describedby="mobile-format-hint" /><span id="mobile-format-hint" className="field-hint">Enter 10 digits. You may also include +91.</span></label>
         <label>Password<input name="password" type="password" value={form.password} onChange={update} autoComplete="new-password" required minLength="12" maxLength="64" placeholder="At least 12 characters" /></label>
         <label>Confirm password<input name="confirmPassword" type="password" value={form.confirmPassword} onChange={update} autoComplete="new-password" required minLength="12" maxLength="64" placeholder="Enter the same password again" /></label>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button button-dark button-full" type="submit" disabled={busy}>
-          {busy ? 'Creating your account…' : 'Create photographer account'} <span aria-hidden="true">↗</span>
+          {busy ? 'Creating your account…' : 'Create photographer account'}
         </button>
         <p className="form-footnote">We’ll send a verification link to your email and a one-time code to your mobile. Your password is stored as a one-way hash.</p>
       </form>
@@ -646,7 +699,7 @@ function LoginPage({ navigate, notice, clearNotice, onLogin, onCustomerLogin }) 
   }
 
   return (
-    <AuthLayout eyebrow="WELCOME BACK" title={accountType === 'photographer' ? <>Pick up right<br /><em>where you left off.</em></> : <>Your memories<br /><em>are close by.</em></>} subtitle={accountType === 'photographer' ? 'Sign in to see what is happening across your studio.' : 'Sign in to view the events you have booked with your photographer.'}>
+    <AuthLayout eyebrow="Welcome back" title={accountType === 'photographer' ? <>Pick up right<br /><em>where you left off.</em></> : <>Your memories<br /><em>are close by.</em></>} subtitle={accountType === 'photographer' ? 'Sign in to see what is happening across your studio.' : 'Sign in to view the events you have booked with your photographer.'}>
       <div className="login-account-types" role="tablist" aria-label="Choose account type">
         <button type="button" role="tab" aria-selected={accountType === 'photographer'} className={accountType === 'photographer' ? 'login-account-type active' : 'login-account-type'} onClick={() => chooseAccountType('photographer')}>Photographer</button>
         <button type="button" role="tab" aria-selected={accountType === 'customer'} className={accountType === 'customer' ? 'login-account-type active' : 'login-account-type'} onClick={() => chooseAccountType('customer')}>Customer</button>
@@ -659,7 +712,7 @@ function LoginPage({ navigate, notice, clearNotice, onLogin, onCustomerLogin }) 
             <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required placeholder="Your password" /></label>
             {error && <p className="form-error" role="alert">{error}</p>}
             <button className="button button-dark button-full" type="submit" disabled={busy}>
-              {busy ? 'Signing in…' : 'Sign in to your studio'} <span aria-hidden="true">↗</span>
+              {busy ? 'Signing in…' : 'Sign in to your studio'}
             </button>
           </form>
           <div className="verification-help">
@@ -674,7 +727,7 @@ function LoginPage({ navigate, notice, clearNotice, onLogin, onCustomerLogin }) 
               <p className="verification-prompt">Enter the 6-digit code sent to your mobile number. In local mode, find it in the backend console.</p>
               <label>Mobile verification code<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength="6" value={mobileCode} onChange={(event) => setMobileCode(event.target.value.replace(/\D/g, '').slice(0, 6))} required placeholder="000000" /></label>
               <button className="button button-dark button-full" type="submit" disabled={mobileBusy || mobileCode.length !== 6}>
-                {mobileBusy ? 'Verifying…' : 'Verify mobile number'} <span aria-hidden="true">↗</span>
+                {mobileBusy ? 'Verifying…' : 'Verify mobile number'}
               </button>
               <div className="verification-help"><span>Code expired or missing?</span><button type="button" onClick={resendMobileCode} disabled={mobileBusy}>{mobileBusy ? 'Sending…' : 'Send a new code'}</button></div>
             </form>
@@ -690,7 +743,7 @@ function LoginPage({ navigate, notice, clearNotice, onLogin, onCustomerLogin }) 
               <label>One-time code<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength="6" value={customerCode} onChange={(event) => setCustomerCode(event.target.value.replace(/\D/g, '').slice(0, 6))} required placeholder="000000" /></label>
               {error && <p className="form-error" role="alert">{error}</p>}
               <button className="button button-dark button-full" type="submit" disabled={customerBusy || customerCode.length !== 6}>
-                {customerBusy ? 'Verifying…' : 'Verify code and continue'} <span aria-hidden="true">↗</span>
+                {customerBusy ? 'Verifying…' : 'Verify code and continue'}
               </button>
               <div className="verification-help customer-otp-actions">
                 <button type="button" onClick={requestCustomerCode} disabled={customerBusy}>{customerBusy ? 'Sending…' : 'Resend code'}</button>
@@ -703,7 +756,7 @@ function LoginPage({ navigate, notice, clearNotice, onLogin, onCustomerLogin }) 
               <label>Mobile number<input type="tel" value={customerMobile} onChange={(event) => setCustomerMobile(event.target.value)} autoComplete="tel" required maxLength="13" pattern="([0-9]{10}|\+91[0-9]{10})" placeholder="9876543210" /></label>
               {error && <p className="form-error" role="alert">{error}</p>}
               <button className="button button-dark button-full" type="submit" disabled={customerBusy}>
-                {customerBusy ? 'Sending code…' : 'Send sign-in code'} <span aria-hidden="true">↗</span>
+                {customerBusy ? 'Sending code…' : 'Send sign-in code'}
               </button>
             </>
           )}
@@ -775,7 +828,7 @@ function VerifyEmailPage({ navigate }) {
 
   return (
     <AuthLayout
-      eyebrow="EMAIL VERIFICATION"
+      eyebrow="Email verification"
       title={mobileVerified ? <>Your account is<br /><em>confirmed.</em></> : verified ? <>Verify your<br /><em>mobile number.</em></> : <>One final step<br /><em>to open your studio.</em></>}
       subtitle={verified
         ? (mobileVerified ? 'Your FrameBucket account is ready. Sign in to continue.' : 'Your email is confirmed. Enter the one-time code sent to your mobile number to finish activating the account.')
@@ -786,14 +839,14 @@ function VerifyEmailPage({ navigate }) {
       {verified ? (
         mobileVerified ? (
           <button className="button button-dark button-full" onClick={() => navigate('/login')}>
-            Go to sign in <span aria-hidden="true">↗</span>
+            Go to sign in
           </button>
         ) : (
           <form className="auth-form" onSubmit={verifyMobile}>
             <p className="verification-prompt">Enter the 6-digit code sent to your mobile number. In local mode, find it in the backend console.</p>
             <label>Mobile verification code<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength="6" value={mobileCode} onChange={(event) => setMobileCode(event.target.value.replace(/\D/g, '').slice(0, 6))} required placeholder="000000" /></label>
             <button className="button button-dark button-full" type="submit" disabled={mobileBusy || mobileCode.length !== 6}>
-              {mobileBusy ? 'Verifying…' : 'Verify mobile number'} <span aria-hidden="true">↗</span>
+              {mobileBusy ? 'Verifying…' : 'Verify mobile number'}
             </button>
             <div className="verification-help"><span>Code expired or missing?</span><button type="button" onClick={resendMobileCode} disabled={mobileBusy}>{mobileBusy ? 'Sending…' : 'Send a new code'}</button></div>
             {mobileNotice && <p className="form-success" role="status">{mobileNotice}</p>}
@@ -801,7 +854,7 @@ function VerifyEmailPage({ navigate }) {
         )
       ) : token ? (
         <button className="button button-dark button-full" onClick={verify} disabled={busy}>
-          {busy ? 'Confirming email…' : 'Confirm my email'} <span aria-hidden="true">↗</span>
+          {busy ? 'Confirming email…' : 'Confirm my email'}
         </button>
       ) : null}
       <p className="auth-switch">Already confirmed? <button onClick={() => navigate('/login')}>Go to sign in</button></p>
@@ -882,9 +935,9 @@ function EventGuestCheckinPage({ token }) {
 
   return (
     <main className="guest-checkin-shell">
-      <header className="guest-checkin-header"><Brand /></header>
+      <header className="guest-checkin-header"><Brand /><ThemeToggle /></header>
       <section className="guest-checkin-card" aria-labelledby="guest-checkin-title">
-        <p className="eyebrow">FRAMEBUCKET · EVENT PHOTOS</p>
+        <p className="eyebrow">Event photos</p>
         {loading ? <p className="customer-empty">Loading event…</p> : error && !event ? (
           <div><h1 id="guest-checkin-title">This link is unavailable.</h1><p className="guest-checkin-copy">Ask the photographer for the event QR code again.</p></div>
         ) : submitted ? (
@@ -922,15 +975,20 @@ function EventGuestCheckinPage({ token }) {
 }
 
 function AuthLayout({ eyebrow, title, subtitle, children }) {
+  const [theme] = useTheme();
   return (
     <main className="auth-shell">
       <aside className="auth-side">
         <Brand />
-        <div className="auth-side-note"><span>01 / YOUR WORKSPACE</span><p>Every good story<br />starts with <em>a little space.</em></p><span className="auth-side-rule" /></div>
-        <span className="auth-side-caption">FRAMEBUCKET · PHOTOGRAPHER PORTAL</span>
+        <div className="auth-side-scene" aria-hidden="true"><HeroScene theme={theme} /></div>
+        <div className="auth-side-note"><p>Every good story<br />starts with <em>a little space.</em></p></div>
+        <span className="auth-side-caption">The FrameBucket photographer portal</span>
       </aside>
       <section className="auth-main">
-        <button className="back-link" onClick={() => window.history.length > 1 ? window.history.back() : window.location.assign('/')}>← Back</button>
+        <div className="auth-topbar">
+          <button className="back-link" onClick={() => window.history.length > 1 ? window.history.back() : window.location.assign('/')}>← Back</button>
+          <ThemeToggle />
+        </div>
         <div className="auth-content">
           <p className="eyebrow">{eyebrow}</p>
           <h1>{title}</h1>
@@ -944,6 +1002,18 @@ function AuthLayout({ eyebrow, title, subtitle, children }) {
 
 function Dashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('overview');
+  const tabsRef = useRef(null);
+  const [tabIndicator, setTabIndicator] = useState(null);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const active = tabsRef.current?.querySelector('.module-tab.active');
+      if (active) setTabIndicator({ x: active.offsetLeft, width: active.offsetWidth });
+    };
+    measure();
+    document.fonts?.ready.then(measure).catch(() => {});
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [activeTab]);
   const [dataEventId, setDataEventId] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -995,6 +1065,7 @@ function Dashboard({ user, onLogout }) {
       <header className="dashboard-header">
         <Brand />
         <div className="account-menu">
+          <ThemeToggle />
           <div className="photographer-profile" ref={profileMenuRef}>
             <button
               className="photographer-profile-trigger"
@@ -1016,7 +1087,7 @@ function Dashboard({ user, onLogout }) {
                 role="dialog"
                 aria-labelledby="photographer-profile-title"
               >
-                <p className="photographer-profile-kicker">ACCOUNT DETAILS</p>
+                <p className="photographer-profile-kicker">Account details</p>
                 <h2 id="photographer-profile-title" ref={profileHeadingRef} tabIndex={-1}>Photographer profile</h2>
                 <dl className="photographer-profile-details">
                   <div><dt>Photographer ID</dt><dd className="photographer-profile-id">{user.id || 'Unavailable'}</dd></div>
@@ -1031,26 +1102,27 @@ function Dashboard({ user, onLogout }) {
         </div>
       </header>
       <section className="dashboard-welcome">
-        <p className="eyebrow"><span className="eyebrow-dot" /> YOUR STUDIO WORKSPACE</p>
+        <p className="eyebrow"><span className="eyebrow-dot" /> Your studio workspace</p>
         <h1>Good to have you here, <em>{firstName}.</em></h1>
         <p>Choose where you want to pick up today.</p>
       </section>
       {error && <p className="form-error dashboard-error" role="alert">{error}</p>}
-      <nav className="module-tabs" aria-label="Workspace modules">
+      <nav className={tabIndicator ? 'module-tabs has-indicator' : 'module-tabs'} aria-label="Workspace modules" ref={tabsRef}>
+        {tabIndicator && <span className="module-tab-indicator" aria-hidden="true" style={{ width: tabIndicator.width, transform: `translateX(${tabIndicator.x}px)` }} />}
         <button className={activeTab === 'overview' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('overview')} aria-pressed={activeTab === 'overview'}>
-          Overview <span className="tab-arrow">↗</span>
+          Overview
         </button>
         <button className={activeTab === 'enquiries' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('enquiries')} aria-pressed={activeTab === 'enquiries'}>
-          Enquiries <span className="tab-arrow">↗</span>
+          Enquiries
         </button>
         <button className={activeTab === 'customers' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('customers')} aria-pressed={activeTab === 'customers'}>
-          Customers <span className="tab-arrow">↗</span>
+          Customers
         </button>
         <button className={activeTab === 'events' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('events')} aria-pressed={activeTab === 'events'}>
-          Events <span className="tab-arrow">↗</span>
+          Events
         </button>
         <button className={activeTab === 'team' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('team')} aria-pressed={activeTab === 'team'}>
-          Team <span className="tab-arrow">↗</span>
+          Team
         </button>
         <button
           className={activeTab === 'data' ? 'module-tab active' : 'module-tab'}
@@ -1059,11 +1131,13 @@ function Dashboard({ user, onLogout }) {
           disabled={!dataModuleEnabled}
           title={dataModuleEnabled ? 'Open the Data module' : 'The Data module is not included with Bronze.'}
         >
-          Data {!dataModuleEnabled && <span className="tab-lock">BRONZE</span>} <span className="tab-arrow">↗</span>
+          Data {!dataModuleEnabled && <span className="tab-lock">Bronze</span>}
         </button>
       </nav>
       <p className="workflow-sequence">Photography workflow <b>Enquiries</b><span>→</span><b>Customers</b><span>→</span><b>Events</b><span>→</span><b>Team</b><span>→</span><b>Data</b></p>
-      {activeTab === 'overview' ? <DashboardOverview user={user} /> : activeTab === 'enquiries' ? <EnquiryPanel user={user} /> : activeTab === 'customers' ? <CustomerPanel user={user} /> : activeTab === 'events' ? <EventPanel user={user} onOpenGallery={(event) => { setDataEventId(event.id); setActiveTab('data'); }} /> : activeTab === 'team' ? <TeamPanel user={user} /> : <DataPanel initialEventId={dataEventId} />}
+      <div className="module-stage" key={activeTab}>
+        {activeTab === 'overview' ? <DashboardOverview user={user} /> : activeTab === 'enquiries' ? <EnquiryPanel user={user} /> : activeTab === 'customers' ? <CustomerPanel user={user} /> : activeTab === 'events' ? <EventPanel user={user} onOpenGallery={(event) => { setDataEventId(event.id); setActiveTab('data'); }} /> : activeTab === 'team' ? <TeamPanel user={user} /> : <DataPanel initialEventId={dataEventId} />}
+      </div>
       <footer className="dashboard-footer"><Brand /><span>Your growth counts.</span><span>© 2026 FrameBucket</span></footer>
     </main>
   );
@@ -1106,7 +1180,7 @@ function DashboardOverview({ user }) {
     <section className="dashboard-overview" aria-labelledby="dashboard-overview-title">
       <div className="dashboard-overview-heading">
         <div>
-          <p className="eyebrow">YOUR STUDIO AT A GLANCE</p>
+          <p className="eyebrow">Your studio at a glance</p>
           <h2 id="dashboard-overview-title">{studioName}</h2>
           <p>Monthly activity and event revenue in one place.</p>
         </div>
@@ -1119,12 +1193,12 @@ function DashboardOverview({ user }) {
         <>
           <div className="overview-revenue-summary">
             <article>
-              <span>REVENUE THIS MONTH</span>
+              <span>Revenue this month</span>
               <strong>{formatInr(Number(summary.revenueThisMonth))}</strong>
               <small>Event bookings created in {summary.monthLabel}</small>
             </article>
             <article>
-              <span>REVENUE THIS FINANCIAL YEAR</span>
+              <span>Revenue this financial year</span>
               <strong>{formatInr(Number(summary.revenueThisFinancialYear))}</strong>
               <small>Since April 1, {summary.financialYearLabel.split('–')[0]}</small>
             </article>
@@ -1331,7 +1405,7 @@ function EnquiryPanel({ user }) {
   return (
     <section className="enquiry-module" aria-labelledby="enquiry-list-title">
       <div className="customer-module-intro">
-        <p className="eyebrow">THE FIRST STEP IN YOUR PHOTO WORKFLOW</p>
+        <p className="eyebrow">The first step in your photo workflow</p>
         <h2>Enquiries <em>start here.</em></h2>
         <p>Keep new requests together, send each customer a quotation link, save your negotiated amount, then create the event.</p>
       </div>
@@ -1339,11 +1413,11 @@ function EnquiryPanel({ user }) {
       {notice && <p className="form-success customer-message" role="status">{notice}</p>}
       <section className="customer-list-section" aria-labelledby="enquiry-list-title">
         <div className="customer-list-heading">
-          <div><p className="eyebrow">NEW CUSTOMER REQUESTS</p><h3 id="enquiry-list-title">Enquiries</h3><p>Enquiry IDs combine your studio sub ID with their creation time.</p></div>
+          <div><p className="eyebrow">New customer requests</p><h3 id="enquiry-list-title">Enquiries</h3><p>Enquiry IDs combine your studio sub ID with their creation time.</p></div>
           <button className="button button-dark" type="button" onClick={() => { setError(''); setNotice(''); setShowCreate(true); }}>＋ New enquiry</button>
         </div>
         {loading ? <p className="customer-empty">Loading enquiries…</p> : enquiries.length === 0 ? (
-          <div className="customer-empty-state"><div className="upload-mark">＋</div><h4>Your enquiry list is ready.</h4><p>Create an enquiry to send a customer a secure quotation builder link.</p><button className="button button-dark" type="button" onClick={() => setShowCreate(true)}>Create your first enquiry <span aria-hidden="true">↗</span></button></div>
+          <div className="customer-empty-state"><div className="upload-mark">＋</div><h4>Your enquiry list is ready.</h4><p>Create an enquiry to send a customer a secure quotation builder link.</p><button className="button button-dark" type="button" onClick={() => setShowCreate(true)}>Create your first enquiry</button></div>
         ) : (
           <div className="customer-table-scroll">
             <table className="customer-table enquiry-table">
@@ -1411,7 +1485,7 @@ function EnquiryRegistrationModal({ eventTypes, busy, onClose, onCreate, onCreat
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
       <section className="event-modal enquiry-modal" role="dialog" aria-modal="true" aria-labelledby="enquiry-registration-title">
-        <div className="modal-heading"><div><p className="eyebrow">NEW CUSTOMER REQUEST</p><h2 id="enquiry-registration-title">Create enquiry</h2></div><button className="modal-close" type="button" onClick={onClose} aria-label="Close enquiry form" disabled={busy}>×</button></div>
+        <div className="modal-heading"><div><p className="eyebrow">New customer request</p><h2 id="enquiry-registration-title">Create enquiry</h2></div><button className="modal-close" type="button" onClick={onClose} aria-label="Close enquiry form" disabled={busy}>×</button></div>
         <p className="enquiry-modal-note">The customer will receive an email and WhatsApp message with a secure quotation link.</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         <form className="event-form" onSubmit={submit}>
@@ -1419,7 +1493,7 @@ function EnquiryRegistrationModal({ eventTypes, busy, onClose, onCreate, onCreat
           <label className="event-form-label">Enquiry Number<input name="mobileNumber" type="tel" value={form.mobileNumber} onChange={update} required maxLength="13" pattern="([0-9]{10}|\+91[0-9]{10})" placeholder="9876543210" /><span className="field-hint">Enter 10 digits. You may also include +91.</span></label>
           <label className="event-form-label">Enquiry Email ID<input name="email" type="email" value={form.email} onChange={update} autoComplete="email" required maxLength="320" placeholder="customer@example.com" /></label>
           <label className="event-form-label">Enquiry Event<span className="event-type-picker"><select name="eventTypeId" value={form.eventTypeId} onChange={update} required><option value="" disabled>Select an event</option>{eventTypes.map((type) => <option value={type.id} key={type.id}>{type.name}</option>)}</select><button className="button button-quiet button-small" type="button" onClick={() => setShowTypePopup(true)}>＋ New event</button></span></label>
-          <div className="event-form-actions"><button className="button button-quiet" type="button" onClick={onClose} disabled={busy}>Cancel</button><button className="button button-dark" type="submit" disabled={busy || !form.eventTypeId}>{busy ? 'Creating enquiry…' : 'Create enquiry'} <span aria-hidden="true">↗</span></button></div>
+          <div className="event-form-actions"><button className="button button-quiet" type="button" onClick={onClose} disabled={busy}>Cancel</button><button className="button button-dark" type="submit" disabled={busy || !form.eventTypeId}>{busy ? 'Creating enquiry…' : 'Create enquiry'}</button></div>
         </form>
         {showTypePopup && <EventTypeModal onClose={() => setShowTypePopup(false)} onCreate={addEventType} />}
       </section>
@@ -1477,11 +1551,11 @@ function CreateEventFromEnquiryModal({ enquiry, setup, busy, error, onClose, onC
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
       <section className="event-modal enquiry-modal create-event-from-enquiry-modal" role="dialog" aria-modal="true" aria-labelledby="create-event-from-enquiry-title">
-        <div className="modal-heading"><div><p className="eyebrow">ENQUIRY TO EVENT</p><h2 id="create-event-from-enquiry-title">Create event for {enquiry.name}</h2></div><button className="modal-close" type="button" onClick={onClose} aria-label="Close event form" disabled={busy}>×</button></div>
+        <div className="modal-heading"><div><p className="eyebrow">Enquiry to event</p><h2 id="create-event-from-enquiry-title">Create event for {enquiry.name}</h2></div><button className="modal-close" type="button" onClick={onClose} aria-label="Close event form" disabled={busy}>×</button></div>
         <p className="enquiry-modal-note">The event will use the saved finalized quote and the {setup.eventTypeName} event type. The quotation PDF will be regenerated with this amount.</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         <form className="event-form" onSubmit={submit}>
-          <div className="event-id-preview"><span>FINALIZED QUOTE</span><b>{formatInr(Number(enquiry.finalizedQuote))}</b></div>
+          <div className="event-id-preview"><span>Finalized quote</span><b>{formatInr(Number(enquiry.finalizedQuote))}</b></div>
           <EventDateCalendar blockedDates={setup.blockedDates} selectedDate={form.eventDate} onSelect={(eventDate) => setForm((current) => ({ ...current, eventDate }))} />
           {setup.customerExists
             ? <p className="enquiry-modal-note existing-customer-note">Existing customer {setup.existingCustomerCode} will be linked to this event.</p>
@@ -1490,7 +1564,7 @@ function CreateEventFromEnquiryModal({ enquiry, setup, busy, error, onClose, onC
               <label className="event-form-label">Date of birth<input type="date" value={form.dateOfBirth} onChange={(event) => setForm((current) => ({ ...current, dateOfBirth: event.target.value }))} required /></label>
               <label className="event-form-label">Address<textarea value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} required maxLength="1000" rows="3" placeholder="Street, city, state and PIN code" /></label>
             </>}
-          <div className="event-form-actions"><button className="button button-quiet" type="button" onClick={onClose} disabled={busy}>Cancel</button><button className="button button-dark" type="submit" disabled={busy || !form.eventDate || (!setup.customerExists && (!form.dateOfBirth || !form.address.trim()))}>{busy ? 'Creating event…' : 'Create Event'} <span aria-hidden="true">↗</span></button></div>
+          <div className="event-form-actions"><button className="button button-quiet" type="button" onClick={onClose} disabled={busy}>Cancel</button><button className="button button-dark" type="submit" disabled={busy || !form.eventDate || (!setup.customerExists && (!form.dateOfBirth || !form.address.trim()))}>{busy ? 'Creating event…' : 'Create Event'}</button></div>
         </form>
       </section>
     </div>
@@ -1540,7 +1614,7 @@ function CustomerPanel({ user }) {
   return (
     <section className="customer-module">
       <div className="customer-module-intro">
-        <p className="eyebrow">YOUR PEOPLE, ALL IN ONE PLACE</p>
+        <p className="eyebrow">Your people, all in one place</p>
         <h2>Customer stories <em>start here.</em></h2>
         <p>Keep customer contact and delivery details together, then link each booking to the right customer record.</p>
       </div>
@@ -1556,7 +1630,7 @@ function CustomerPanel({ user }) {
         <section className="customer-list-section" aria-labelledby="customer-list-title">
           <div className="customer-list-heading">
             <div>
-              <p className="eyebrow">YOUR CUSTOMER RECORDS</p>
+              <p className="eyebrow">Your customer records</p>
               <h3 id="customer-list-title">Customer List</h3>
               <p>Customers registered by {user.studioName || user.fullName}.</p>
             </div>
@@ -1569,7 +1643,7 @@ function CustomerPanel({ user }) {
               <div className="upload-mark">＋</div>
               <h4>Your customer list is ready.</h4>
               <p>Register your first customer to keep their contact and delivery details here.</p>
-              <button className="button button-dark" type="button" onClick={() => setActiveView('register')}>Register your first customer <span aria-hidden="true">↗</span></button>
+              <button className="button button-dark" type="button" onClick={() => setActiveView('register')}>Register your first customer</button>
             </div>
           ) : (
             <div className="customer-table-scroll">
@@ -1698,7 +1772,7 @@ function TeamPanel({ user }) {
   return (
     <section className="customer-module team-module">
       <div className="customer-module-intro">
-        <p className="eyebrow">THE PEOPLE BEHIND YOUR STUDIO</p>
+        <p className="eyebrow">The people behind your studio</p>
         <h2>Build your <em>team.</em></h2>
         <p>Keep your crew’s contact details, languages, and skills together. Send a secure link so each person can complete their own profile.</p>
       </div>
@@ -1714,7 +1788,7 @@ function TeamPanel({ user }) {
         <section className="customer-list-section" aria-labelledby="team-list-title">
           <div className="customer-list-heading">
             <div>
-              <p className="eyebrow">YOUR STUDIO CREW</p>
+              <p className="eyebrow">Your studio crew</p>
               <h3 id="team-list-title">Team List</h3>
               <p>Team members registered by {user.studioName || user.fullName}.</p>
             </div>
@@ -1732,7 +1806,7 @@ function TeamPanel({ user }) {
               <div className="upload-mark">＋</div>
               <h4>Your team list is ready.</h4>
               <p>Add your first team member or freelancer to get started.</p>
-              <button className="button button-dark" type="button" onClick={() => setActiveView('create')}>Create your first team member <span aria-hidden="true">↗</span></button>
+              <button className="button button-dark" type="button" onClick={() => setActiveView('create')}>Create your first team member</button>
             </div>
           ) : (
             <div className="team-profile-groups">
@@ -1823,7 +1897,7 @@ function TeamMemberForm({ onSave, busy }) {
 
   return (
     <section className="customer-registration team-registration" aria-labelledby="team-registration-title">
-      <div className="customer-list-heading"><div><p className="eyebrow">ADD TO YOUR CREW</p><h3 id="team-registration-title">Create team member</h3><p>Register a complete profile or send an invitation link to their mobile.</p></div></div>
+      <div className="customer-list-heading"><div><p className="eyebrow">Add to your crew</p><h3 id="team-registration-title">Create team member</h3><p>Register a complete profile or send an invitation link to their mobile.</p></div></div>
       {validationError && <p className="form-error" role="alert">{validationError}</p>}
       <form className="customer-form team-form" onSubmit={submit}>
         <label>Name<input name="name" value={form.name} onChange={update} autoComplete="name" required maxLength="120" placeholder="Team member’s full name" /></label>
@@ -1835,7 +1909,7 @@ function TeamMemberForm({ onSave, busy }) {
         <p className="customer-form-note">The member type is chosen by you and cannot be changed from the invitation link.</p>
         <div className="customer-form-actions team-form-actions">
           <button className="button button-quiet" type="submit" value="invite" disabled={busy}>{busy ? 'Sending…' : 'Send invite link'}</button>
-          <button className="button button-dark" type="submit" value="create" disabled={busy}>{busy ? 'Saving…' : 'Save team member'} <span aria-hidden="true">↗</span></button>
+          <button className="button button-dark" type="submit" value="create" disabled={busy}>{busy ? 'Saving…' : 'Save team member'}</button>
         </div>
       </form>
     </section>
@@ -1884,10 +1958,10 @@ function TeamInvitePage({ token }) {
 
   return (
     <main className="team-invite-page">
-      <header className="team-invite-header"><Brand /><span>TEAM PROFILE</span></header>
+      <header className="team-invite-header"><Brand /><div className="quote-header-actions"><span>Team profile</span><ThemeToggle /></div></header>
       <section className="team-invite-card">
         {loading ? <p className="customer-empty">Loading invitation…</p> : completed ? <div className="team-invite-complete">
-          <p className="eyebrow">PROFILE SAVED</p><h1>You’re on the team, <em>{completed.name}.</em></h1><p>Your details have been shared with {completed.studioName}.</p>
+          <p className="eyebrow">Profile saved</p><h1>You’re on the team, <em>{completed.name}.</em></h1><p>Your details have been shared with {completed.studioName}.</p>
         </div> : context ? <>
           <p className="eyebrow">{context.studioName} · TEAM INVITATION</p>
           <h1>Complete your <em>profile.</em></h1>
@@ -1902,9 +1976,9 @@ function TeamInvitePage({ token }) {
             <TeamChoiceGroup legend="Language known" options={teamLanguages} values={form.languages} onChange={(languages) => setForm((current) => ({ ...current, languages }))} />
             <TeamChoiceGroup legend="Skills" options={teamSkills} values={form.skills} onChange={(skills) => setForm((current) => ({ ...current, skills }))} />
             {(!form.languages.length || !form.skills.length) && <p className="customer-form-note">Select at least one language and one skill to complete the profile.</p>}
-            <div className="customer-form-actions"><button className="button button-dark" type="submit" disabled={busy || !form.languages.length || !form.skills.length}>{busy ? 'Saving profile…' : 'Complete profile'} <span aria-hidden="true">↗</span></button></div>
+            <div className="customer-form-actions"><button className="button button-dark" type="submit" disabled={busy || !form.languages.length || !form.skills.length}>{busy ? 'Saving profile…' : 'Complete profile'}</button></div>
           </form>
-        </> : <div className="team-invite-complete"><p className="eyebrow">INVITATION UNAVAILABLE</p><h1>This link can’t be <em>used.</em></h1><p>{error || 'Ask your photographer to send you a new invitation.'}</p></div>}
+        </> : <div className="team-invite-complete"><p className="eyebrow">Invitation unavailable</p><h1>This link can’t be <em>used.</em></h1><p>{error || 'Ask your photographer to send you a new invitation.'}</p></div>}
       </section>
       <footer className="team-invite-footer"><Brand /><span>FrameBucket · Photographer portal</span></footer>
     </main>
@@ -2044,7 +2118,7 @@ function EventPanel({ user, onOpenGallery }) {
   return (
     <section className="event-module" aria-labelledby="event-list-title">
       <div className="customer-module-intro">
-        <p className="eyebrow">YOUR BOOKINGS, CLEARLY SCHEDULED</p>
+        <p className="eyebrow">Your bookings, clearly scheduled</p>
         <h2>Events <em>at a glance.</em></h2>
         <p>Keep event dates and customers together, assign your crew, and see the location details customers share.</p>
       </div>
@@ -2069,7 +2143,7 @@ function EventPanel({ user, onOpenGallery }) {
             <div className="upload-mark">＋</div>
             <h4>Your event list is ready.</h4>
             <p>Create an event to add a date to your studio schedule.</p>
-            {customers.length > 0 && <button className="button button-dark" type="button" onClick={() => setShowRegistration(true)}>Create your first event <span aria-hidden="true">↗</span></button>}
+            {customers.length > 0 && <button className="button button-dark" type="button" onClick={() => setShowRegistration(true)}>Create your first event</button>}
           </div>
         ) : (
           <div className="customer-table-scroll">
@@ -2181,12 +2255,12 @@ function EventRegistrationModal({ customers, eventTypes, blockedDates, busy, err
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
       <section className="event-modal" role="dialog" aria-modal="true" aria-labelledby="event-registration-title">
         <div className="modal-heading">
-          <div><p className="eyebrow">NEW BOOKING</p><h2 id="event-registration-title">Event registration</h2></div>
+          <div><p className="eyebrow">New booking</p><h2 id="event-registration-title">Event registration</h2></div>
           <button className="modal-close" type="button" onClick={onClose} aria-label="Close event registration" disabled={busy}>×</button>
         </div>
         {error && <p className="form-error" role="alert">{error}</p>}
         <form className="event-form" onSubmit={submit}>
-          <div className="event-id-preview"><span>EVENT ID</span><b>{eventIdPreview}</b></div>
+          <div className="event-id-preview"><span>Event ID</span><b>{eventIdPreview}</b></div>
           <fieldset className="event-date-field">
             <legend>Event Date</legend>
             <div className="calendar-heading">
@@ -2220,7 +2294,7 @@ function EventRegistrationModal({ customers, eventTypes, blockedDates, busy, err
             {customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.customerCode} · {customer.name}</option>)}
           </select></label>
           <label className="event-form-label">Creation Date<input type="text" value={new Date().toLocaleString()} readOnly /></label>
-          <div className="event-form-actions"><button className="button button-quiet" type="button" onClick={onClose} disabled={busy}>Cancel</button><button className="button button-dark" type="submit" disabled={busy || !form.eventDate || !form.eventTypeId || !form.customerId}>{busy ? 'Saving event…' : 'Save event'} <span aria-hidden="true">↗</span></button></div>
+          <div className="event-form-actions"><button className="button button-quiet" type="button" onClick={onClose} disabled={busy}>Cancel</button><button className="button button-dark" type="submit" disabled={busy || !form.eventDate || !form.eventTypeId || !form.customerId}>{busy ? 'Saving event…' : 'Save event'}</button></div>
         </form>
         {showTypePopup && <EventTypeModal onClose={() => setShowTypePopup(false)} onCreate={addType} />}
       </section>
@@ -2249,7 +2323,7 @@ function EventTypeModal({ onClose, onCreate }) {
   return (
     <div className="modal-backdrop nested-modal-backdrop" role="presentation">
       <section className="event-type-modal" role="dialog" aria-modal="true" aria-labelledby="event-type-title">
-        <div className="modal-heading"><div><p className="eyebrow">CUSTOM EVENT</p><h2 id="event-type-title">Add event type</h2></div><button className="modal-close" type="button" onClick={onClose} aria-label="Close event type dialog" disabled={busy}>×</button></div>
+        <div className="modal-heading"><div><p className="eyebrow">Custom event</p><h2 id="event-type-title">Add event type</h2></div><button className="modal-close" type="button" onClick={onClose} aria-label="Close event type dialog" disabled={busy}>×</button></div>
         {error && <p className="form-error" role="alert">{error}</p>}
         <form className="event-type-form" onSubmit={submit}>
           <label className="event-form-label">Event type name<input value={name} onChange={(event) => setName(event.target.value)} required maxLength="100" autoFocus placeholder="For example, Graduation" /></label>
@@ -2277,7 +2351,7 @@ function CustomerDetailsModal({ customerId, onClose }) {
   return (
     <div className="modal-backdrop detail-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="customer-detail-modal" role="dialog" aria-modal="true" aria-labelledby="customer-detail-title">
-        <div className="modal-heading"><div><p className="eyebrow">CUSTOMER RECORD</p><h2 id="customer-detail-title">Customer details</h2></div><button className="modal-close" type="button" onClick={onClose} aria-label="Close customer details">×</button></div>
+        <div className="modal-heading"><div><p className="eyebrow">Customer record</p><h2 id="customer-detail-title">Customer details</h2></div><button className="modal-close" type="button" onClick={onClose} aria-label="Close customer details">×</button></div>
         {loading && <p className="customer-empty">Loading customer…</p>}
         {error && <p className="form-error" role="alert">{error}</p>}
         {customer && <dl className="customer-detail-list">
@@ -2312,7 +2386,7 @@ function CustomerRegistrationForm({ onRegister, busy }) {
     <section className="customer-registration" aria-labelledby="customer-registration-title">
       <div className="customer-list-heading">
         <div>
-          <p className="eyebrow">NEW CLIENT</p>
+          <p className="eyebrow">New client</p>
           <h3 id="customer-registration-title">Customer Registration</h3>
           <p>Add a customer record to your studio.</p>
         </div>
@@ -2322,29 +2396,21 @@ function CustomerRegistrationForm({ onRegister, busy }) {
         <label>Email<input name="email" type="email" value={form.email} onChange={update} autoComplete="email" required maxLength="320" placeholder="customer@example.com" /></label>
         <label>Mobile number<input name="mobileNumber" type="tel" value={form.mobileNumber} onChange={update} autoComplete="tel" required maxLength="13" pattern="([0-9]{10}|\+91[0-9]{10})" placeholder="9876543210" aria-describedby="customer-mobile-hint" /><span className="field-hint" id="customer-mobile-hint">Enter 10 digits. You may also include +91.</span></label>
         <label>Date of birth<input name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={update} required /></label>
-        <label className="customer-address-field">Address <span className="optional-label">FOR DATA HAMPER DELIVERY</span><textarea name="address" value={form.address} onChange={update} required maxLength="1000" rows="4" placeholder="Street, city, state and PIN code" /></label>
+        <label className="customer-address-field">Address <span className="optional-label">For data hamper delivery</span><textarea name="address" value={form.address} onChange={update} required maxLength="1000" rows="4" placeholder="Street, city, state and PIN code" /></label>
         <p className="customer-form-note">A photographer scoped Customer ID is assigned automatically when this record is saved.</p>
         <div className="customer-form-actions">
-          <button className="button button-dark" type="submit" disabled={busy}>{busy ? 'Saving customer…' : 'Save customer'} <span aria-hidden="true">↗</span></button>
+          <button className="button button-dark" type="submit" disabled={busy}>{busy ? 'Saving customer…' : 'Save customer'}</button>
         </div>
       </form>
     </section>
   );
 }
 
-const quoteFestivalDates = new Set([
-  '2026-01-14', '2026-03-04', '2026-08-28', '2026-10-20', '2026-11-08',
-  '2027-01-14', '2027-03-22', '2027-09-15', '2027-10-09', '2027-10-29',
-  '2028-01-14', '2028-03-11', '2028-09-04', '2028-09-27', '2028-10-17',
-]);
-
 function QuotationBuilderPage({ token }) {
   const [context, setContext] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ venue: '', eventDate: '', preferredTime: 'Morning', events: [], albumSheets: 0, couponCode: '' });
-  const [couponInput, setCouponInput] = useState('');
-  const [couponMessage, setCouponMessage] = useState('FESTFSK10 may be used on selected festival dates.');
+  const [form, setForm] = useState({ venue: '', eventDate: '', preferredTime: 'Morning', events: [], albumSheets: 0 });
   const [finalPrice, setFinalPrice] = useState(null);
   const [pricingBusy, setPricingBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -2385,7 +2451,6 @@ function QuotationBuilderPage({ token }) {
         preferredTime: form.preferredTime,
         events: form.events,
         albumSheets: Number(form.albumSheets) || 0,
-        couponCode: form.couponCode || null,
       })
         .then((price) => { if (!cancelled) { setFinalPrice(price.finalPrice); setError(''); } })
         .catch((requestError) => { if (!cancelled) setError(requestError.message); })
@@ -2411,24 +2476,7 @@ function QuotationBuilderPage({ token }) {
   }
 
   function updateDate(event) {
-    setForm((current) => ({ ...current, eventDate: event.target.value, couponCode: '' }));
-    if (form.couponCode) setCouponMessage('Coupon cleared because the event date changed.');
-  }
-
-  function applyCoupon() {
-    const code = couponInput.trim().toUpperCase();
-    if (code !== 'FESTFSK10') {
-      setForm((current) => ({ ...current, couponCode: '' }));
-      setCouponMessage('That coupon code is not valid.');
-      return;
-    }
-    if (!quoteFestivalDates.has(form.eventDate)) {
-      setForm((current) => ({ ...current, couponCode: '' }));
-      setCouponMessage('This code is available only on configured festival dates.');
-      return;
-    }
-    setForm((current) => ({ ...current, couponCode: code }));
-    setCouponMessage('Festival offer applied to your estimate.');
+    setForm((current) => ({ ...current, eventDate: event.target.value }));
   }
 
   async function submitQuotation(event) {
@@ -2442,7 +2490,6 @@ function QuotationBuilderPage({ token }) {
         preferredTime: form.preferredTime,
         events: form.events,
         albumSheets: Number(form.albumSheets) || 0,
-        couponCode: form.couponCode || null,
       });
       setFinalPrice(result.finalPrice);
       setPdfUrl(api.publicQuotePdfUrl(token));
@@ -2456,21 +2503,21 @@ function QuotationBuilderPage({ token }) {
 
   if (loading) return <LoadingPage />;
   if (error && !context) {
-    return <main className="quote-builder-shell"><header className="quote-builder-header"><Brand /></header><div className="quote-error-card"><p className="eyebrow">QUOTATION LINK</p><h1>This link is unavailable.</h1><p>{error}</p></div></main>;
+    return <main className="quote-builder-shell"><header className="quote-builder-header"><Brand /><ThemeToggle /></header><div className="quote-error-card"><p className="eyebrow">Quotation link</p><h1>This link is unavailable.</h1><p>{error}</p></div></main>;
   }
   if (!context) return <LoadingPage />;
 
   if (submitted) {
     return (
       <main className="quote-builder-shell">
-        <header className="quote-builder-header"><Brand /><span>{context.studioName}</span></header>
+        <header className="quote-builder-header"><Brand /><div className="quote-header-actions"><span>{context.studioName}</span><ThemeToggle /></div></header>
         <section className="quote-submitted-card">
           <div className="quote-submitted-mark">✓</div>
-          <p className="eyebrow">QUOTATION SUBMITTED</p>
+          <p className="eyebrow">Quotation submitted</p>
           <h1>Your estimate is ready.</h1>
           <p>The photographer has been notified. You can open your quotation PDF below.</p>
           {finalPrice !== null && <strong className="quote-final-amount">{formatInr(Number(finalPrice))}</strong>}
-          <a className="button button-dark" href={pdfUrl || api.publicQuotePdfUrl(token)} target="_blank" rel="noreferrer">Open quotation PDF <span aria-hidden="true">↗</span></a>
+          <a className="button button-dark" href={pdfUrl || api.publicQuotePdfUrl(token)} target="_blank" rel="noreferrer">Open quotation PDF</a>
         </section>
         <footer className="quote-builder-footer">© 2026 FrameBucket · {context.studioName}</footer>
       </main>
@@ -2481,9 +2528,9 @@ function QuotationBuilderPage({ token }) {
 
   return (
     <main className="quote-builder-shell">
-      <header className="quote-builder-header"><Brand /><span>{context.studioName} · Photography &amp; Films</span></header>
+      <header className="quote-builder-header"><Brand /><div className="quote-header-actions"><span>{context.studioName} · Photography &amp; Films</span><ThemeToggle /></div></header>
       <section className="quote-hero">
-        <p className="eyebrow">YOUR CELEBRATION, BEAUTIFULLY TOLD</p>
+        <p className="eyebrow">Your celebration, beautifully told</p>
         <h1>Every moment deserves<br /><em>to be remembered.</em></h1>
         <p>Build a photography package that fits your celebration. Review your final estimate, then submit it to your photographer.</p>
         <div className="quote-hero-tags"><span>✦ Made for your event</span><span>✦ Final estimate shown</span><span>✦ No component prices</span></div>
@@ -2495,14 +2542,14 @@ function QuotationBuilderPage({ token }) {
           <div className="quote-layout">
             <div className="quote-left-column">
               <section className="quote-card">
-                <div className="quote-card-heading"><div><h2>Let’s get to know you</h2><p>Your enquiry details are ready for this quotation.</p></div><span>STEP 01</span></div>
-                <div className="quote-contact-grid"><div><small>NAME</small><b>{context.customerName}</b></div><div><small>MOBILE</small><b>{context.customerMobile}</b></div><div><small>EMAIL</small><b>{context.customerEmail}</b></div><div><small>MAIN OCCASION</small><b>{context.enquiryEvent}</b></div></div>
+                <div className="quote-card-heading"><div><h2>Let’s get to know you</h2><p>Your enquiry details are ready for this quotation.</p></div><span>Step 1</span></div>
+                <div className="quote-contact-grid"><div><small>Name</small><b>{context.customerName}</b></div><div><small>Mobile</small><b>{context.customerMobile}</b></div><div><small>Email</small><b>{context.customerEmail}</b></div><div><small>Main occasion</small><b>{context.enquiryEvent}</b></div></div>
               </section>
               <section className="quote-card">
-                <div className="quote-card-heading"><div><h2>Build your event package</h2><p>Choose event coverage and services for each event.</p></div><span>STEP 02</span></div>
+                <div className="quote-card-heading"><div><h2>Build your event package</h2><p>Choose event coverage and services for each event.</p></div><span>Step 2</span></div>
                 <div className="quote-fields-grid">
                   <label>Number of events<select value={form.events.length || 1} onChange={(event) => setEventCount(event.target.value)}>{Array.from({ length: 8 }, (_, index) => <option value={index + 1} key={index}>{index + 1} event{index ? 's' : ''}</option>)}</select></label>
-                  <label>Venue / city <span className="optional-label">OPTIONAL</span><input value={form.venue} onChange={(event) => setForm((current) => ({ ...current, venue: event.target.value }))} maxLength="240" placeholder="City or venue name" /></label>
+                  <label>Venue / city <span className="optional-label">Optional</span><input value={form.venue} onChange={(event) => setForm((current) => ({ ...current, venue: event.target.value }))} maxLength="240" placeholder="City or venue name" /></label>
                 </div>
                 <div className="quote-event-cards">
                   {form.events.map((quoteEvent, index) => (
@@ -2519,21 +2566,19 @@ function QuotationBuilderPage({ token }) {
                 </div>
               </section>
               <section className="quote-card">
-                <div className="quote-card-heading"><div><h2>Make it an album</h2><p>Add a printed album to preserve your favourite memories.</p></div><span>OPTIONAL</span></div>
+                <div className="quote-card-heading"><div><h2>Make it an album</h2><p>Add a printed album to preserve your favourite memories.</p></div><span>Optional</span></div>
                 <div className="quote-album-row"><div><b>Premium photo album</b><p>Each sheet includes an average of 4–6 photos.</p></div><label>Number of sheets<input type="number" min="0" max="500" step="1" value={form.albumSheets} onChange={(event) => setForm((current) => ({ ...current, albumSheets: event.target.value }))} /></label></div>
               </section>
               <section className="quote-card">
-                <div className="quote-card-heading"><div><h2>Check dates &amp; plan your booking</h2><p>Tell the studio your preferred date and time.</p></div><span>NEXT STEP</span></div>
+                <div className="quote-card-heading"><div><h2>Check dates &amp; plan your booking</h2><p>Tell the studio your preferred date and time.</p></div><span>Next step</span></div>
                 <div className="quote-fields-grid"><label>Main event date<input type="date" min={today} value={form.eventDate} onChange={updateDate} /></label><label>Preferred time<select value={form.preferredTime} onChange={(event) => setForm((current) => ({ ...current, preferredTime: event.target.value }))}><option>Morning</option><option>Afternoon</option><option>Evening</option><option>Full day</option></select></label></div>
-                <div className="quote-coupon-row"><label>Festival coupon code<input value={couponInput} onChange={(event) => setCouponInput(event.target.value)} placeholder="Enter FESTFSK10" /></label><button className="button button-quiet" type="button" onClick={applyCoupon}>Apply code</button></div>
-                <p className="quote-coupon-note">{couponMessage}</p>
               </section>
             </div>
             <aside className="quote-summary-card">
-              <p className="quote-summary-kicker">YOUR PERSONALISED ESTIMATE</p><h2>Quotation summary</h2>
+              <p className="quote-summary-kicker">Your personalised estimate</p><h2>Quotation summary</h2>
               <div className="quote-summary-total"><span>Estimated total</span>{pricingBusy ? <b>Updating…</b> : finalPrice === null ? <b>—</b> : <b>{formatInr(Number(finalPrice))}</b>}</div>
               <p className="quote-summary-note">This estimate is subject to date availability and final confirmation by {context.studioName}.</p>
-              <button className="button button-light quote-submit-button" type="submit" disabled={submitting || pricingBusy || finalPrice === null || form.events.length === 0}>{submitting ? 'Submitting quotation…' : 'Submit quotation'} <span aria-hidden="true">↗</span></button>
+              <button className="button button-light quote-submit-button" type="submit" disabled={submitting || pricingBusy || finalPrice === null || form.events.length === 0}>{submitting ? 'Submitting quotation…' : 'Submit quotation'}</button>
               <p className="quote-summary-fineprint">Submitting sends the quotation PDF to your photographer. This estimate is not a confirmed booking.</p>
             </aside>
           </div>
@@ -2601,13 +2646,14 @@ function CustomerPortalPage({ customer, onLogout }) {
       <header className="customer-portal-header">
         <Brand />
         <div className="account-menu">
+          <ThemeToggle />
           <span className="account-avatar">{customer.name.slice(0, 1).toUpperCase()}</span>
           <span className="account-name">{customer.name}</span>
           <button className="button button-quiet button-small" type="button" onClick={logout} disabled={signingOut}>{signingOut ? 'Signing out…' : 'Sign out'}</button>
         </div>
       </header>
       <section className="customer-portal-welcome">
-        <p className="eyebrow"><span className="eyebrow-dot" /> YOUR FRAMEBUCKET EVENTS</p>
+        <p className="eyebrow"><span className="eyebrow-dot" /> Your FrameBucket events</p>
         <h1>Welcome, <em>{customer.name.split(' ')[0]}.</em></h1>
         <p>See your booked photoshoot events and the photographer managing each one.</p>
       </section>
@@ -2616,10 +2662,10 @@ function CustomerPortalPage({ customer, onLogout }) {
       <section className="customer-event-section" aria-labelledby="booked-events-title">
         <div className="customer-event-heading">
           <div>
-            <p className="eyebrow">YOUR BOOKINGS</p>
+            <p className="eyebrow">Your bookings</p>
             <h2 id="booked-events-title">Booked events</h2>
           </div>
-          {!loading && <span className="event-count">{events.length} {events.length === 1 ? 'EVENT' : 'EVENTS'}</span>}
+          {!loading && <span className="event-count">{events.length} {events.length === 1 ? 'event' : 'events'}</span>}
         </div>
         {loading ? (
           <p className="customer-empty">Loading your events…</p>
@@ -2808,7 +2854,7 @@ function CustomerGalleryModal({ event, onClose, onSubmitted }) {
   return (
     <div className="modal-backdrop gallery-modal-backdrop" role="presentation" onMouseDown={(clickEvent) => { if (clickEvent.target === clickEvent.currentTarget && !busy) onClose(); }}>
       <section className="gallery-modal" role="dialog" aria-modal="true" aria-labelledby="customer-gallery-title">
-        <div className="modal-heading"><div><p className="eyebrow">YOUR EVENT PHOTOS</p><h2 id="customer-gallery-title">{view === 'review' ? 'Finalize selection' : `${event.eventName} gallery`}</h2></div><button className="modal-close" type="button" onClick={onClose} disabled={busy} aria-label="Close gallery">×</button></div>
+        <div className="modal-heading"><div><p className="eyebrow">Your event photos</p><h2 id="customer-gallery-title">{view === 'review' ? 'Finalize selection' : `${event.eventName} gallery`}</h2></div><button className="modal-close" type="button" onClick={onClose} disabled={busy} aria-label="Close gallery">×</button></div>
         <p className="gallery-modal-note">{event.albumSubmitted ? 'Your selection has been sent to your photographer. You can still view and download this gallery.' : 'Choose photos for album design. Your selection is saved while you move between folders. Videos can be viewed and downloaded, but cannot be selected for album design.'}</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         {notice && <p className="form-success" role="status">{notice}</p>}
@@ -2954,12 +3000,12 @@ function CustomerLocationModal({ event, busy, error, onClose, onSave }) {
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(clickEvent) => { if (clickEvent.target === clickEvent.currentTarget && !busy) onClose(); }}>
       <section className="event-modal customer-location-modal" role="dialog" aria-modal="true" aria-labelledby="customer-location-title">
-        <div className="modal-heading"><div><p className="eyebrow">HELP YOUR PHOTOGRAPHER FIND YOU</p><h2 id="customer-location-title">Event location</h2></div><button className="modal-close" type="button" onClick={onClose} disabled={busy} aria-label="Close location details">×</button></div>
+        <div className="modal-heading"><div><p className="eyebrow">Help your photographer find you</p><h2 id="customer-location-title">Event location</h2></div><button className="modal-close" type="button" onClick={onClose} disabled={busy} aria-label="Close location details">×</button></div>
         <p className="event-form-note">Choose the venue in Google Maps, then share its link here. Your landmark and notes will help your crew find the exact entrance.</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         <form className="event-form" onSubmit={submit}>
           <label className="event-form-label">Location or venue name<input name="locationName" value={form.locationName} onChange={update} required maxLength="240" placeholder="Venue name or full address" /></label>
-          <a className="button button-quiet google-maps-picker" href={googleMapsSearchUrl(form.locationName)} target="_blank" rel="noreferrer">Choose in Google Maps <span aria-hidden="true">↗</span></a>
+          <a className="button button-quiet google-maps-picker" href={googleMapsSearchUrl(form.locationName)} target="_blank" rel="noreferrer">Choose in Google Maps</a>
           <label className="event-form-label">Google Maps share link<input name="locationMapUrl" type="url" value={form.locationMapUrl} onChange={update} maxLength="2048" placeholder="https://maps.app.goo.gl/…" /></label>
           {mapLinkError && <p className="form-error" role="alert">{mapLinkError}</p>}
           <p className="customer-form-note">In Google Maps, select the venue, choose Share, and paste the copied link here. If you leave this blank, we’ll create a Google Maps search link from the venue name.</p>
@@ -2967,7 +3013,7 @@ function CustomerLocationModal({ event, busy, error, onClose, onSave }) {
           <label className="event-form-label">Notes for reaching the location<textarea name="notes" value={form.notes} onChange={update} maxLength="2000" rows="3" placeholder="Any directions or access details for your photographer" /></label>
           <label className="event-form-label">Event time<input name="eventTime" type="time" value={form.eventTime} onChange={update} required /></label>
           <p className="customer-form-note">Please update the time which Photographer should be ready</p>
-          <div className="event-form-actions"><button className="button button-quiet" type="button" onClick={onClose} disabled={busy}>Cancel</button><button className="button button-dark" type="submit" disabled={busy}>{busy ? 'Saving details…' : 'Save event details'} <span aria-hidden="true">↗</span></button></div>
+          <div className="event-form-actions"><button className="button button-quiet" type="button" onClick={onClose} disabled={busy}>Cancel</button><button className="button button-dark" type="submit" disabled={busy}>{busy ? 'Saving details…' : 'Save event details'}</button></div>
         </form>
       </section>
     </div>
@@ -2984,6 +3030,7 @@ function DataPanel({ initialEventId = '' }) {
   const [loadingGallery, setLoadingGallery] = useState(false);
   const [busy, setBusy] = useState(false);
   const [localSyncRunning, setLocalSyncRunning] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
   const [newFolder, setNewFolder] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -3025,6 +3072,17 @@ function DataPanel({ initialEventId = '' }) {
     return () => { cancelled = true; };
   }, [eventId, folderId]);
 
+  const processingCount = media.filter((item) => item.status === 'QUEUED' || item.status === 'PROCESSING').length;
+  useEffect(() => {
+    if (!eventId || processingCount === 0) return undefined;
+    const timer = window.setInterval(() => {
+      api.photographerMedia(eventId, folderId)
+        .then((response) => setMedia(response.photos || []))
+        .catch(() => {});
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [eventId, folderId, processingCount]);
+
   async function addFolder(submitEvent) {
     submitEvent.preventDefault();
     if (!eventId || !newFolder.trim()) return;
@@ -3052,18 +3110,23 @@ function DataPanel({ initialEventId = '' }) {
     setNotice('');
     let uploaded = 0;
     try {
-      for (const file of files) {
-        await api.uploadDataFile(eventId, folderId, file);
+      for (const [index, file] of files.entries()) {
+        const position = files.length > 1 ? `${index + 1} of ${files.length} · ` : '';
+        setUploadStatus(`Uploading ${position}0%`);
+        await api.uploadDataFile(eventId, folderId, file, (fraction) => {
+          setUploadStatus(`Uploading ${position}${Math.round(fraction * 100)}%`);
+        });
         uploaded += 1;
       }
       const response = await api.photographerMedia(eventId, folderId);
       setMedia(response.photos || []);
-      setNotice(`${uploaded} ${uploaded === 1 ? 'file' : 'files'} uploaded. Originals are private to your photographer account.`);
+      setNotice(`${uploaded} ${uploaded === 1 ? 'file' : 'files'} uploaded and queued for processing. Previews appear here, and in the customer gallery, as soon as each one is ready. Originals stay private to your account.`);
     } catch (requestError) {
       setError(uploaded ? `${uploaded} file(s) uploaded; the next upload failed: ${requestError.message}` : requestError.message);
       api.photographerMedia(eventId, folderId).then((response) => setMedia(response.photos || [])).catch(() => {});
     } finally {
       setBusy(false);
+      setUploadStatus('');
       changeEvent.target.value = '';
     }
   }
@@ -3073,11 +3136,11 @@ function DataPanel({ initialEventId = '' }) {
     <section className="gallery-module" aria-labelledby="data-gallery-title">
       <div className="gallery-intro">
         <div>
-          <p className="eyebrow">PRIVATE ORIGINALS · CUSTOMER PREVIEWS</p>
+          <p className="eyebrow">Private originals, customer previews</p>
           <h2 id="data-gallery-title">Event <em>galleries.</em></h2>
           <p>Upload images and videos, organize them into folders, and give customers access to processed previews. Original files stay private to your account.</p>
         </div>
-        <span className="gallery-count">{media.length} {media.length === 1 ? 'ITEM' : 'ITEMS'}</span>
+        <span className="gallery-count">{media.length} {media.length === 1 ? 'item' : 'items'}{processingCount > 0 ? `, ${processingCount} processing` : ''}</span>
       </div>
       {error && <p className="form-error customer-message" role="alert">{error}</p>}
       {notice && <p className="form-success customer-message" role="status">{notice}</p>}
@@ -3104,7 +3167,7 @@ function DataPanel({ initialEventId = '' }) {
               <button className="button button-quiet" type="submit" disabled={busy || localSyncRunning || !newFolder.trim()}>＋ Add folder</button>
             </form>
             <label className={`button button-dark gallery-upload ${busy || localSyncRunning ? 'is-busy' : ''}`}>
-              {busy ? 'Uploading…' : localSyncRunning ? 'Auto-sync active' : '＋ Upload photos / videos'}
+              {busy ? (uploadStatus || 'Uploading…') : localSyncRunning ? 'Auto-sync active' : '＋ Upload photos / videos'}
               <input type="file" multiple accept="image/*,.arw,.cr2,.cr3,.dng,.nef,.orf,.raf,.rw2,video/mp4,video/quicktime,video/webm,.avi,.m4v" onChange={uploadFiles} disabled={busy || localSyncRunning || !selectedEvent} />
             </label>
           </div>
@@ -3134,12 +3197,16 @@ function DataPanel({ initialEventId = '' }) {
               {media.map((item) => (
                 <article className="gallery-card" key={item.photo_id}>
                   <div className="gallery-card-preview">
-                    {item.media_type === 'video'
-                      ? <video src={api.photographerPreviewUrl(eventId, item.photo_id)} controls preload="metadata" aria-label={item.original_filename} />
-                      : <img src={api.photographerPreviewUrl(eventId, item.photo_id)} alt={item.original_filename} loading="lazy" />}
+                    {item.status === 'PROCESSING_FAILED'
+                      ? <div className="gallery-card-pending is-failed" title={item.error || ''}><b>Processing failed</b><span>Download the original and upload it again.</span></div>
+                      : item.status === 'QUEUED' || item.status === 'PROCESSING'
+                        ? <div className="gallery-card-pending" role="status"><b>{item.status === 'QUEUED' ? 'Queued' : 'Processing…'}</b><span>{item.media_type === 'video' ? 'Preparing the customer video' : 'Creating the customer preview'}</span></div>
+                        : item.media_type === 'video'
+                          ? <video src={api.photographerPreviewUrl(eventId, item.photo_id)} controls preload="metadata" aria-label={item.original_filename} />
+                          : <img src={api.photographerPreviewUrl(eventId, item.photo_id)} alt={item.original_filename} loading="lazy" />}
                     <span className="gallery-photo-number">{item.media_type === 'video' ? 'VIDEO' : `#${item.photo_number}`}</span>
                   </div>
-                  <div className="gallery-card-copy"><b title={item.original_filename}>{item.original_filename}</b><span>{item.media_type === 'video' ? 'Customer video' : `${item.width || '—'} × ${item.height || '—'} · processed preview`}</span></div>
+                  <div className="gallery-card-copy"><b title={item.original_filename}>{item.original_filename}</b><span>{item.status !== 'READY' && item.status !== 'SUBMITTED_FOR_ALBUM' ? 'Original saved' : item.media_type === 'video' ? 'Customer video' : `${item.width || '—'} × ${item.height || '—'} · processed preview`}</span></div>
                   <a className="gallery-original-link" href={api.photographerOriginalUrl(eventId, item.photo_id)}>Download original ↗</a>
                 </article>
               ))}

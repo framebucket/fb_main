@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -74,28 +73,57 @@ public class DataGalleryService {
     public Map<String, Object> mediaForPhotographer(UUID eventId, PhotographerPrincipal principal, String folderId) {
         EventBooking event = photographerEvent(eventId, principal);
         ensureProvisioned(event);
-        return dataService.listMedia(storageEventId(event), event.getCustomer().getId().toString(), folderId);
+        return dataService.listMedia(storageEventId(event), event.getCustomer().getId().toString(), folderId, true);
     }
 
-    public Map<String, Object> upload(UUID eventId, PhotographerPrincipal principal, String folderId, MultipartFile file) {
+    /**
+     * Registers an upload and returns where the browser should PUT the file. With S3-compatible
+     * storage this is a short-lived presigned bucket URL; otherwise it is this application's
+     * same-origin content endpoint, which streams the bytes to the data service.
+     */
+    public Map<String, Object> initUpload(UUID eventId, PhotographerPrincipal principal, String folderId,
+                                          String filename, long sizeBytes, String contentType) {
         EventBooking event = photographerEvent(eventId, principal);
         ensureProvisioned(event);
-        if (file == null || file.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose a non-empty photo or video file.");
+        Map<String, Object> grant = new java.util.LinkedHashMap<>(dataService.initUpload(
+                storageEventId(event), principal.getId().toString(), event.getCustomer().getId().toString(),
+                folderId, filename, sizeBytes, contentType));
+        boolean direct = grant.get("upload_url") instanceof String url && !url.isBlank();
+        if (!direct) {
+            grant.put("upload_url", "/api/events/" + eventId + "/gallery/uploads/" + grant.get("photo_id") + "/content");
+            grant.put("upload_headers", Map.of("Content-Type", "application/octet-stream"));
         }
-        Map<String, Object> result = new java.util.LinkedHashMap<>(dataService.upload(
-                storageEventId(event), principal.getId().toString(),
-                event.getCustomer().getId().toString(), folderId, file));
-        try {
-            Object matchedGuestIds = result.remove("matched_guest_ids");
-            guestPhotoDeliveryService.enqueueUploadMatches(event, matchedGuestIds,
-                    result.get("photo_id") instanceof String photoId ? photoId : null,
-                    result.get("photo_number") instanceof Number number ? number.intValue() : null);
-        } catch (RuntimeException exception) {
-            LOGGER.warn("The upload succeeded for event {}, but matched guest photo messages could not be queued.",
-                    event.getEventCode(), exception);
-        }
-        return result;
+        grant.put("same_origin", !direct);
+        return grant;
+    }
+
+    public void uploadContent(UUID eventId, String mediaId, PhotographerPrincipal principal,
+                              java.io.InputStream content, long contentLength) {
+        EventBooking event = photographerEvent(eventId, principal);
+        dataService.uploadContent(storageEventId(event), mediaId, principal.getId().toString(),
+                event.getCustomer().getId().toString(), content, contentLength);
+    }
+
+    public Map<String, Object> completeUpload(UUID eventId, String mediaId, PhotographerPrincipal principal) {
+        EventBooking event = photographerEvent(eventId, principal);
+        return dataService.completeUpload(storageEventId(event), mediaId, principal.getId().toString(),
+                event.getCustomer().getId().toString());
+    }
+
+    public String previewUrlForPhotographer(UUID eventId, String mediaId, PhotographerPrincipal principal) {
+        EventBooking event = photographerEvent(eventId, principal);
+        return dataService.previewUrl(storageEventId(event), mediaId, event.getCustomer().getId().toString());
+    }
+
+    public String previewUrlForCustomer(UUID eventId, String mediaId, CustomerPrincipal principal) {
+        EventBooking event = customerEvent(eventId, principal);
+        return dataService.previewUrl(storageEventId(event), mediaId, event.getCustomer().getId().toString());
+    }
+
+    public String originalUrlForPhotographer(UUID eventId, String mediaId, PhotographerPrincipal principal) {
+        EventBooking event = photographerEvent(eventId, principal);
+        return dataService.originalUrl(storageEventId(event), mediaId, principal.getId().toString(),
+                event.getCustomer().getId().toString());
     }
 
     public Map<String, Object> mediaForCustomer(UUID eventId, CustomerPrincipal principal) {
@@ -162,14 +190,25 @@ public class DataGalleryService {
         if (!(link instanceof String albumLink) || albumLink.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "The album-design link was not returned by the data service.");
         }
+        // The data service packages the RAW files in the background; the photographer is notified
+        // when the archive is ready (see DataServiceOutboxPoller -> notifyAlbumReady).
         event.setEventGallery(albumLink);
         events.save(event);
-        notifyPhotographer(event, albumLink);
         Map<String, Object> customerResult = new java.util.LinkedHashMap<>();
         customerResult.put("status", submission.getOrDefault("status", "SUBMITTED"));
         customerResult.put("photo_count", submission.getOrDefault("photo_count", 0));
         customerResult.put("photo_numbers", submission.getOrDefault("photo_numbers", List.of()));
         return customerResult;
+    }
+
+    @Transactional(readOnly = true)
+    public void notifyAlbumReady(UUID eventId) {
+        EventBooking event = events.findById(eventId).orElse(null);
+        if (event == null || event.getEventGallery() == null || event.getEventGallery().isBlank()) {
+            LOGGER.warn("An album archive became ready for unknown event {} or the event has no album link.", eventId);
+            return;
+        }
+        notifyPhotographer(event, event.getEventGallery());
     }
 
     private void notifyPhotographer(EventBooking event, String albumLink) {

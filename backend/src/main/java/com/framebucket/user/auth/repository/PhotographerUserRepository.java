@@ -25,4 +25,7 @@ public interface PhotographerUserRepository extends JpaRepository<PhotographerUs
     List<PhotographerUser> findAllByMobileNumber(String mobileNumber);
 
     List<PhotographerUser> findAllBySubIdIsNull();
+
+    /** Photographers who completed sign-up (email and mobile verified) and are active. */
+    long countByActiveTrueAndEmailVerifiedTrueAndMobileVerifiedTrue();
 }

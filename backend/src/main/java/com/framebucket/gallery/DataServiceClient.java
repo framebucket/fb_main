@@ -5,7 +5,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.core.io.Resource;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -18,7 +17,6 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
@@ -94,31 +92,95 @@ public class DataServiceClient {
     }
 
     public Map<String, Object> listMedia(String eventId, String customerId, String folderId) {
+        return listMedia(eventId, customerId, folderId, false);
+    }
+
+    public Map<String, Object> listMedia(String eventId, String customerId, String folderId, boolean includePending) {
+        String pending = Boolean.toString(includePending);
         URI uri = folderId == null || folderId.isBlank()
-                ? query("/api/v1/events/" + eventId + "/photos", "customer_id", customerId)
-                : query("/api/v1/events/" + eventId + "/photos", "customer_id", customerId, "folder_id", folderId);
+                ? query("/api/v1/events/" + eventId + "/photos", "customer_id", customerId, "include_pending", pending)
+                : query("/api/v1/events/" + eventId + "/photos", "customer_id", customerId, "folder_id", folderId,
+                        "include_pending", pending);
         return getJson(uri);
     }
 
-    public Map<String, Object> upload(String eventId, String photographerId, String customerId,
-                                      String folderId, MultipartFile file) {
-        URI uri = query("/api/v1/events/" + eventId + "/photos",
-                "photographer_id", photographerId,
-                "customer_id", customerId,
-                "folder_id", folderId == null || folderId.isBlank() ? "root" : folderId);
-        return exchange(() -> {
-            MultiValueMap<String, Object> multipart = new LinkedMultiValueMap<>();
-            Resource resource = file.getResource();
-            HttpHeaders partHeaders = new HttpHeaders();
-            String filename = file.getOriginalFilename();
-            partHeaders.setContentDispositionFormData(
-                    "file", filename == null || filename.isBlank() ? "upload" : filename);
-            partHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            multipart.add("file", new HttpEntity<>(resource, partHeaders));
-            return restClient.post().uri(uri).header(SERVICE_KEY_HEADER, token())
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(multipart).retrieve().body(JSON_MAP);
-        });
+    public Map<String, Object> initUpload(String eventId, String photographerId, String customerId,
+                                          String folderId, String filename, long sizeBytes, String contentType) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("photographer_id", photographerId);
+        body.put("customer_id", customerId);
+        body.put("folder_id", folderId == null || folderId.isBlank() ? "root" : folderId);
+        body.put("filename", filename);
+        body.put("size_bytes", sizeBytes);
+        if (contentType != null && !contentType.isBlank()) body.put("content_type", contentType);
+        return postJson("/api/v1/events/" + eventId + "/uploads", body);
+    }
+
+    /** Streams upload bytes to the data service when direct storage uploads are unavailable. */
+    public void uploadContent(String eventId, String mediaId, String photographerId, String customerId,
+                              InputStream content, long contentLength) {
+        URI uri = query("/api/v1/events/" + eventId + "/uploads/" + mediaId + "/content",
+                "photographer_id", photographerId, "customer_id", customerId);
+        HttpRequest.BodyPublisher publisher = contentLength >= 0
+                ? HttpRequest.BodyPublishers.fromPublisher(HttpRequest.BodyPublishers.ofInputStream(() -> content), contentLength)
+                : HttpRequest.BodyPublishers.ofInputStream(() -> content);
+        HttpRequest request = HttpRequest.newBuilder(uri)
+                .timeout(Duration.ofMinutes(30))
+                .header(SERVICE_KEY_HEADER, token())
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
+                .PUT(publisher)
+                .build();
+        try {
+            HttpResponse<String> response = STREAM_CLIENT.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw serviceError(response.statusCode(), response.body());
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The upload was interrupted.", exception);
+        } catch (IOException exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "The Python data service is unavailable. Start it on " + baseUrl + ".", exception);
+        }
+    }
+
+    public Map<String, Object> completeUpload(String eventId, String mediaId, String photographerId, String customerId) {
+        return postJson(query("/api/v1/events/" + eventId + "/uploads/" + mediaId + "/complete",
+                "photographer_id", photographerId, "customer_id", customerId), Map.of());
+    }
+
+    /** A short-lived direct storage URL for processed media, or null when it must be streamed. */
+    public String previewUrl(String eventId, String mediaId, String customerId) {
+        return urlFrom(getJson(query("/api/v1/events/" + eventId + "/photos/" + mediaId + "/preview-url",
+                "customer_id", customerId)));
+    }
+
+    public String originalUrl(String eventId, String mediaId, String photographerId, String customerId) {
+        return urlFrom(getJson(query("/api/v1/events/" + eventId + "/photos/" + mediaId + "/original-url",
+                "photographer_id", photographerId, "customer_id", customerId)));
+    }
+
+    public List<Map<String, Object>> claimOutbox(int limit, int leaseSeconds) {
+        Object items = postJson("/api/v1/outbox/claim", Map.of("limit", limit, "lease_seconds", leaseSeconds)).get("items");
+        if (!(items instanceof List<?> list)) return List.of();
+        List<Map<String, Object>> result = new java.util.ArrayList<>();
+        for (Object item : list) {
+            if (item instanceof Map<?, ?> map) {
+                Map<String, Object> copy = new java.util.LinkedHashMap<>();
+                map.forEach((key, value) -> copy.put(String.valueOf(key), value));
+                result.add(copy);
+            }
+        }
+        return result;
+    }
+
+    public void ackOutbox(List<Long> ids) {
+        if (ids.isEmpty()) return;
+        postJson("/api/v1/outbox/ack", Map.of("ids", ids));
+    }
+
+    private static String urlFrom(Map<String, Object> response) {
+        return response.get("url") instanceof String url && !url.isBlank() ? url : null;
     }
 
     public Map<String, Object> registerGuestFace(String eventId, String guestId, String customerId,

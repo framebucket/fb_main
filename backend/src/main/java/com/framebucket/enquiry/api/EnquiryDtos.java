@@ -125,8 +125,7 @@ public final class EnquiryDtos {
             LocalDate eventDate,
             @Size(max = 40) String preferredTime,
             @NotEmpty @Size(max = 8) List<@Valid QuoteEventRequest> events,
-            @Min(0) @Max(500) int albumSheets,
-            @Size(max = 40) String couponCode
+            @Min(0) @Max(500) int albumSheets
     ) {
     }
 

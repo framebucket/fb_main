@@ -64,7 +64,7 @@ For Photographer A, create:
 - Several events on distinct dates, including a future date to test date blocking.
 - One enquiry using a separate synthetic customer identity.
 
-Use future event dates that are not already booked by the same photographer. For the festival-coupon case, 14 January 2027 is a configured future coupon date at the time this plan was prepared; if the test is run later, choose another configured future date.
+Use future event dates that are not already booked by the same photographer.
 
 ### Execution conventions
 
@@ -379,17 +379,13 @@ Use a fresh browser profile or clear site cookies between roles. Do not reuse on
 
 **Expected:** Estimate changes when selections change and submit stays disabled while pricing is updating. One album sheet adds ₹400 before the standard discount (for the one-sheet-only example, expected final is ₹380). The quote page shows the final estimate, not a per-service price list. Values remain within configured event/sheet limits.
 
-#### QUO-04 — Festival coupon validation
+#### QUO-04 — Quote builder has no coupon field
 
-**Priority:** P1 · **Automation suitability:** High
+**Priority:** P2 · **Automation suitability:** High
 
-1. With a future date from the configured festival-date list, enter FESTFSK10 and Apply code.
-2. Confirm the offer feedback and recalculated total. For one Conventional Photography service on an eligible date, expected total is ₹6,300 after standard and festival discounts.
-3. Enter an invalid code and apply.
-4. Enter FESTFSK10 on a date not in the configured list.
-5. Change the event date after applying a valid coupon.
+1. Open a valid quote link and review the date and booking section.
 
-**Expected:** Coupon applies only with the supported code and a configured festival date. Invalid code/date does not reduce price. Changing the date clears an applied coupon and updates feedback.
+**Expected:** No coupon input or Apply code button is shown. The estimate applies only the standard discount.
 
 #### QUO-05 — Submit quote once and open the PDF
 

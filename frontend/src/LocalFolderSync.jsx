@@ -360,11 +360,11 @@ export default function LocalFolderSync({
     <section className="local-sync-panel" aria-labelledby="local-sync-title">
       <div className="local-sync-heading">
         <div>
-          <p className="eyebrow">CAMERA TO GALLERY</p>
+          <p className="eyebrow">Camera to gallery</p>
           <h3 id="local-sync-title">Live folder sync</h3>
           <p>Choose the laptop folder where your camera saves photos. New photos and videos upload to this event automatically.</p>
         </div>
-        <span className={`local-sync-indicator ${syncing ? 'is-running' : ''}`}>{syncing ? 'SYNCING' : 'MANUAL START'}</span>
+        <span className={`local-sync-indicator ${syncing ? 'is-running' : ''}`}>{syncing ? 'Syncing' : 'Manual start'}</span>
       </div>
 
       {!supported && <p className="local-sync-warning">Automatic folder sync needs Chrome or Edge on this HTTPS site. The regular upload button still works in other browsers.</p>}

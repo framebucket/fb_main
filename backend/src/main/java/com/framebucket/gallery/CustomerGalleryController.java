@@ -62,6 +62,8 @@ public class CustomerGalleryController {
                                                          @PathVariable String mediaId,
                                                          @RequestHeader(value = HttpHeaders.RANGE, required = false) String range,
                                                          @AuthenticationPrincipal CustomerPrincipal customer) {
+        String url = gallery.previewUrlForCustomer(eventId, mediaId, customer);
+        if (url != null) return PhotographerGalleryController.redirect(url);
         return stream(gallery.previewForCustomer(eventId, mediaId, range, customer));
     }
 

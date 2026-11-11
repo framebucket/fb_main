@@ -82,6 +82,51 @@ async function requestMultipart(path, body) {
   return payload;
 }
 
+async function putUploadBody(grant, file, onProgress) {
+  const sameOrigin = Boolean(grant.same_origin);
+  const headers = { ...(grant.upload_headers || {}) };
+  if (sameOrigin) {
+    if (!csrfToken) await loadCsrfToken();
+    headers['X-XSRF-TOKEN'] = csrfToken;
+  }
+  await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(grant.upload_method || 'PUT', sameOrigin ? apiBase + grant.upload_url : grant.upload_url);
+    // Direct storage URLs are presigned; cookies are only needed for the same-origin fallback.
+    xhr.withCredentials = sameOrigin;
+    Object.entries(headers).forEach(([name, value]) => xhr.setRequestHeader(name, value));
+    xhr.upload.onprogress = (progressEvent) => {
+      if (onProgress && progressEvent.lengthComputable) onProgress(progressEvent.loaded / progressEvent.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+        return;
+      }
+      let message = `The upload failed (HTTP ${xhr.status}).`;
+      try { message = JSON.parse(xhr.responseText)?.detail || message; } catch { /* storage returns XML errors */ }
+      reject(new Error(message));
+    };
+    xhr.onerror = () => reject(new Error('The upload was interrupted. Check your connection and try again.'));
+    xhr.send(file);
+  });
+}
+
+async function uploadGalleryFile(eventId, folderId, file, onProgress) {
+  const base = `/api/events/${encodeURIComponent(eventId)}/gallery/uploads`;
+  const grant = await request(base, {
+    method: 'POST',
+    body: {
+      folderId: folderId || 'root',
+      filename: file.name,
+      sizeBytes: file.size,
+      contentType: file.type || '',
+    },
+  });
+  await putUploadBody(grant, file, onProgress);
+  return request(`${base}/${encodeURIComponent(grant.photo_id)}/complete`, { method: 'POST' });
+}
+
 async function downloadBlob(path, body, filename) {
   if (!csrfToken) {
     await loadCsrfToken();
@@ -174,6 +219,7 @@ export const api = {
   completeTeamInvite: (token, form) => request(`/api/public/team-invites/${encodeURIComponent(token)}`, { method: 'PUT', body: form }),
   enquiries: () => request('/api/enquiries'),
   dashboardSummary: () => request('/api/dashboard/summary'),
+  publicStats: () => request('/api/public/stats'),
   createEnquiry: (form) => request('/api/enquiries', { method: 'POST', body: form }),
   convertEnquiry: (enquiryId, form) => request(`/api/enquiries/${encodeURIComponent(enquiryId)}/convert`, { method: 'POST', body: form }),
   saveEnquiryFinalizedQuote: (enquiryId, finalizedQuote) => request(`/api/enquiries/${encodeURIComponent(enquiryId)}/finalized-quote`, { method: 'PUT', body: { finalizedQuote } }),
@@ -207,11 +253,7 @@ export const api = {
   dataFolders: (eventId) => request(`/api/events/${encodeURIComponent(eventId)}/gallery/folders`),
   createDataFolder: (eventId, name) => request(`/api/events/${encodeURIComponent(eventId)}/gallery/folders`, { method: 'POST', body: { name } }),
   photographerMedia: (eventId, folderId) => request(`/api/events/${encodeURIComponent(eventId)}/gallery/media${folderId ? `?folderId=${encodeURIComponent(folderId)}` : ''}`),
-  uploadDataFile: (eventId, folderId, file) => {
-    const form = new FormData();
-    form.append('file', file, file.name);
-    return requestMultipart(`/api/events/${encodeURIComponent(eventId)}/gallery/media?folderId=${encodeURIComponent(folderId || 'root')}`, form);
-  },
+  uploadDataFile: (eventId, folderId, file, onProgress) => uploadGalleryFile(eventId, folderId, file, onProgress),
   customerMedia: (eventId) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/gallery/media`),
   customerSelection: (eventId) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/gallery/selection`),
   saveCustomerSelection: (eventId, photoIds) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/gallery/selection`, { method: 'PUT', body: { photoIds } }),

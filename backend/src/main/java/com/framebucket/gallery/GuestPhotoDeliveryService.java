@@ -43,17 +43,19 @@ public class GuestPhotoDeliveryService {
         this.templateLanguage = templateLanguage;
     }
 
-    public void enqueueUploadMatches(EventBooking event, Object rawGuestIds, String photoId, Integer photoNumber) {
-        if (!(rawGuestIds instanceof List<?> guestIds) || photoId == null || photoId.isBlank()) return;
-        for (Object rawGuestId : guestIds) {
-            if (!(rawGuestId instanceof String guestId)) continue;
-            try {
-                guests.findByIdAndEvent_Id(UUID.fromString(guestId), event.getId())
-                        .ifPresent(guest -> enqueue(guest, photoId, photoNumber));
-            } catch (IllegalArgumentException exception) {
-                LOGGER.warn("The data service returned an invalid matched guest ID for event {}.", event.getEventCode());
-            }
+    /** Queues a WhatsApp delivery for a face match found by the data-service worker. */
+    public boolean enqueueMatch(UUID eventId, String guestId, String photoId, Integer photoNumber) {
+        if (photoId == null || photoId.isBlank() || guestId == null) return false;
+        UUID guestUuid;
+        try {
+            guestUuid = UUID.fromString(guestId);
+        } catch (IllegalArgumentException exception) {
+            LOGGER.warn("The data service returned an invalid matched guest ID for event {}.", eventId);
+            return false;
         }
+        return guests.findByIdAndEvent_Id(guestUuid, eventId)
+                .map(guest -> enqueue(guest, photoId, photoNumber))
+                .orElse(false);
     }
 
     public int enqueueExistingMatches(EventBooking event, EventGuest guest, Object rawPhotoIds) {

@@ -57,8 +57,6 @@ public class Quotation {
     @Column(name = "album_sheets", nullable = false)
     private int albumSheets;
 
-    @Column(name = "coupon_code", length = 40)
-    private String couponCode;
 
     @Column(name = "final_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal finalPrice;
@@ -91,7 +89,6 @@ public class Quotation {
             int eventCount,
             String eventSelectionsJson,
             int albumSheets,
-            String couponCode,
             BigDecimal finalPrice,
             byte[] quotePdf
     ) {
@@ -108,7 +105,6 @@ public class Quotation {
         this.eventCount = eventCount;
         this.eventSelectionsJson = eventSelectionsJson;
         this.albumSheets = albumSheets;
-        this.couponCode = couponCode;
         this.finalPrice = finalPrice;
         this.quotePdf = quotePdf;
         this.originalPrice = finalPrice;
@@ -166,9 +162,6 @@ public class Quotation {
         return albumSheets;
     }
 
-    public String getCouponCode() {
-        return couponCode;
-    }
 
     public void replaceFinalPriceAndPdf(BigDecimal finalPrice, byte[] quotePdf) {
         this.finalPrice = finalPrice;
