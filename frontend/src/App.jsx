@@ -2695,7 +2695,7 @@ function CustomerPortalPage({ customer, onLogout }) {
                       {event.locationLandmark && <small>Landmark: {event.locationLandmark}</small>}
                       <button className="customer-id-link" type="button" onClick={() => setLocationEvent(event)}>{event.locationName ? 'Update location' : 'Add location details'}</button>
                     </div></td>
-                    <td><button className="button button-dark button-small event-gallery-button" type="button" onClick={() => setGalleryEvent(event)}>{event.albumSubmitted ? 'View gallery · sent' : 'Open gallery'}</button></td>
+                    <td><button className="button button-dark button-small event-gallery-button" type="button" onClick={() => setGalleryEvent(event)}>{event.albumSubmitted ? 'Open gallery · sent' : 'Open gallery'}</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -2855,7 +2855,7 @@ function CustomerGalleryModal({ event, onClose, onSubmitted }) {
     <div className="modal-backdrop gallery-modal-backdrop" role="presentation" onMouseDown={(clickEvent) => { if (clickEvent.target === clickEvent.currentTarget && !busy) onClose(); }}>
       <section className="gallery-modal" role="dialog" aria-modal="true" aria-labelledby="customer-gallery-title">
         <div className="modal-heading"><div><p className="eyebrow">Your event photos</p><h2 id="customer-gallery-title">{view === 'review' ? 'Finalize selection' : `${event.eventName} gallery`}</h2></div><button className="modal-close" type="button" onClick={onClose} disabled={busy} aria-label="Close gallery">×</button></div>
-        <p className="gallery-modal-note">{event.albumSubmitted ? 'Your selection has been sent to your photographer. You can still view and download this gallery.' : 'Choose photos for album design. Your selection is saved while you move between folders. Videos can be viewed and downloaded, but cannot be selected for album design.'}</p>
+        <p className="gallery-modal-note">{event.albumSubmitted ? 'You have already sent a selection to your photographer. You can choose photos again and submit a new selection at any time; each one is sent as a new album-design request. Videos can be viewed and downloaded, but cannot be selected.' : 'Choose photos for album design. Your selection is saved while you move between folders. Videos can be viewed and downloaded, but cannot be selected for album design.'}</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         {notice && <p className="form-success" role="status">{notice}</p>}
         {loading ? <p className="customer-empty">Loading event gallery…</p> : media.length === 0 ? (
@@ -2885,7 +2885,7 @@ function CustomerGalleryModal({ event, onClose, onSubmitted }) {
               </div>
             </div>
             {savingSelection && <p className="gallery-selection-status" role="status">Saving selection to your temporary folder…</p>}
-            {!savingSelection && !event.albumSubmitted && selectedIds.length > 0 && <p className="gallery-selection-status" role="status">{selectedIds.length} photo{selectedIds.length === 1 ? '' : 's'} staged for album design across your folders.</p>}
+            {!savingSelection && selectedIds.length > 0 && <p className="gallery-selection-status" role="status">{selectedIds.length} photo{selectedIds.length === 1 ? '' : 's'} staged for album design across your folders.</p>}
             {visibleMedia.length === 0 ? (
               <div className="gallery-empty"><span aria-hidden="true">✦</span><h3>This folder is ready.</h3><p>There are no customer photos in this folder yet.</p></div>
             ) : (
@@ -2899,10 +2899,10 @@ function CustomerGalleryModal({ event, onClose, onSubmitted }) {
                           ? <video src={api.customerPreviewUrl(event.eventId, item.photo_id)} controls preload="metadata" aria-label={item.original_filename} />
                           : <button className="customer-photo-open" type="button" onClick={() => setEnlargedPhotoId(item.photo_id)} aria-label={`Enlarge photo ${item.photo_number}`}><img src={api.customerPreviewUrl(event.eventId, item.photo_id)} alt={item.original_filename} loading="lazy" /></button>}
                         <span className="gallery-photo-number">{item.media_type === 'video' ? 'VIDEO' : `#${item.photo_number}`}</span>
-                        {item.media_type !== 'video' && !event.albumSubmitted && <label className={`gallery-photo-checkbox ${selected ? 'is-selected' : ''}`} title={`Select photo ${item.photo_number} for album design`}><input id={`customer-photo-select-${item.photo_id}`} type="checkbox" aria-label={`Select photo ${item.photo_number} for album design`} checked={selected} onChange={(changeEvent) => togglePhoto(item.photo_id, changeEvent.target.checked)} disabled={busy} /></label>}
+                        {item.media_type !== 'video' && <label className={`gallery-photo-checkbox ${selected ? 'is-selected' : ''}`} title={`Select photo ${item.photo_number} for album design`}><input id={`customer-photo-select-${item.photo_id}`} type="checkbox" aria-label={`Select photo ${item.photo_number} for album design`} checked={selected} onChange={(changeEvent) => togglePhoto(item.photo_id, changeEvent.target.checked)} disabled={busy} /></label>}
                       </div>
                       <div className="gallery-card-copy"><b title={item.original_filename}>{item.original_filename}</b><span>{item.media_type === 'video' ? 'Video preview' : `${folderNames.get(item.folder_id) || 'Gallery'} · Processed photo`}</span></div>
-                      {item.media_type !== 'video' && !event.albumSubmitted && <label className="gallery-select-caption" htmlFor={`customer-photo-select-${item.photo_id}`}>select for album design</label>}
+                      {item.media_type !== 'video' && <label className="gallery-select-caption" htmlFor={`customer-photo-select-${item.photo_id}`}>select for album design</label>}
                     </article>
                   );
                 })}
@@ -2911,13 +2911,13 @@ function CustomerGalleryModal({ event, onClose, onSubmitted }) {
           </>
         )}
         <div className="gallery-modal-actions">
-          <span>{event.albumSubmitted ? 'Selection already sent' : `${selectedIds.length} photos selected`}</span>
+          <span>{event.albumSubmitted && selectedIds.length === 0 ? 'Earlier selection sent. Choose photos to send a new one.' : `${selectedIds.length} photos selected`}</span>
           {view === 'review' ? <>
             <button className="button button-quiet" type="button" onClick={() => setView('gallery')} disabled={busy}>Back to gallery</button>
-            {!event.albumSubmitted && <button className="button button-dark" type="button" onClick={submitSelection} disabled={busy || selectedIds.length === 0}>{busy ? 'Submitting…' : 'Submit for Album design'}</button>}
+            {<button className="button button-dark" type="button" onClick={submitSelection} disabled={busy || selectedIds.length === 0}>{busy ? 'Submitting…' : 'Submit for Album design'}</button>}
           </> : <>
             <button className="button button-quiet" type="button" onClick={onClose} disabled={busy}>Close</button>
-            {!event.albumSubmitted && <button className="button button-dark" type="button" onClick={finalizeSelection} disabled={busy || loading || selectedIds.length === 0 || savingSelection}>{busy ? 'Preparing…' : 'Finalize Selection'}</button>}
+            {<button className="button button-dark" type="button" onClick={finalizeSelection} disabled={busy || loading || selectedIds.length === 0 || savingSelection}>{busy ? 'Preparing…' : 'Finalize Selection'}</button>}
           </>}
         </div>
         {enlargedPhoto && <div className="gallery-lightbox" role="presentation" onMouseDown={(clickEvent) => { if (clickEvent.target === clickEvent.currentTarget) setEnlargedPhotoId(null); }}>
@@ -2930,7 +2930,7 @@ function CustomerGalleryModal({ event, onClose, onSubmitted }) {
                 <span className="gallery-lightbox-number">Photo {enlargedPhotoIndex + 1} of {navigablePhotos.length} · #{enlargedPhoto.photo_number}</span>
                 <button className="button button-quiet" type="button" onClick={() => moveEnlargedPhoto(1)} disabled={navigablePhotos.length < 2}>Next →</button>
               </div>
-              {!event.albumSubmitted && <label className={`gallery-select-photo gallery-lightbox-selection ${selectedIds.includes(enlargedPhoto.photo_id) ? 'is-selected' : ''}`}><input type="checkbox" checked={selectedIds.includes(enlargedPhoto.photo_id)} onChange={(changeEvent) => togglePhoto(enlargedPhoto.photo_id, changeEvent.target.checked)} disabled={busy} /> select for album design</label>}
+              {<label className={`gallery-select-photo gallery-lightbox-selection ${selectedIds.includes(enlargedPhoto.photo_id) ? 'is-selected' : ''}`}><input type="checkbox" checked={selectedIds.includes(enlargedPhoto.photo_id)} onChange={(changeEvent) => togglePhoto(enlargedPhoto.photo_id, changeEvent.target.checked)} disabled={busy} /> select for album design</label>}
               <button className="button button-dark" type="button" onClick={() => downloadPhotos([])} disabled={busy}>{busy ? 'Preparing download…' : 'Download all photos'}</button>
             </div>
           </section>
