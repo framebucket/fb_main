@@ -293,6 +293,13 @@ function ProofsTab({ eventId, user }) {
   const [replyTo, setReplyTo] = useState({});
   const { busy, run, messages, setError } = useAction();
   useEffect(() => { if (proofs.data) setList(proofs.data); }, [proofs.data]);
+  // The client approves or asks for changes from their portal: refresh so the status here follows.
+  useEffect(() => {
+    const refresh = () => api.proofs(eventId).then(setList).catch(() => {});
+    const timer = setInterval(refresh, 20000);
+    window.addEventListener('focus', refresh);
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, [eventId]);
 
   async function uploadSpreads(files) {
     if (!files?.length) return;
@@ -383,6 +390,7 @@ export function CustomerDeliveryModal({ event, onClose }) {
         {!data ? <p className="customer-empty">{delivery.error || 'Loading…'}</p> : (
           <div className="growth-stack">
             {data.brand?.logoUrl && <div className="growth-brand-row"><StudioMark brand={data.brand} /><b>{data.brand.studioName}</b></div>}
+            {proof && proof.status === 'SENT' && <CustomerProofReview eventId={event.eventId} proof={proof} onChange={setProof} />}
             <section>
               <h3 className="studio-h3">Progress</h3>
               {!data.steps.length ? <p className="customer-empty">Your photographer will share delivery milestones here.</p> : (
@@ -408,7 +416,7 @@ export function CustomerDeliveryModal({ event, onClose }) {
                 ))}</div>
               </section>
             )}
-            {proof && <CustomerProofReview eventId={event.eventId} proof={proof} onChange={setProof} />}
+            {proof && proof.status !== 'SENT' && <CustomerProofReview eventId={event.eventId} proof={proof} onChange={setProof} />}
           </div>
         )}
       </Modal>

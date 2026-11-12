@@ -298,6 +298,7 @@ export const api = {
   },
   customerMe: () => request('/api/customer-auth/me'),
   customerEvents: () => request('/api/customer-portal/events'),
+  customerAlbumReviews: () => request('/api/customer-portal/album-reviews'),
   customerFolders: (eventId) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/gallery/folders`),
   dataFolders: (eventId) => request(`/api/events/${encodeURIComponent(eventId)}/gallery/folders`),
   createDataFolder: (eventId, name) => request(`/api/events/${encodeURIComponent(eventId)}/gallery/folders`, { method: 'POST', body: { name } }),

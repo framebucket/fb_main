@@ -2528,6 +2528,10 @@ function CustomerPortalPage({ customer, onLogout }) {
   const [billingEvent, setBillingEvent] = useState(null);
   const [deliveryEvent, setDeliveryEvent] = useState(null);
   const [inviteEvent, setInviteEvent] = useState(null);
+  const [albumReviews, setAlbumReviews] = useState([]);
+  const loadAlbumReviews = () => api.customerAlbumReviews().then(setAlbumReviews).catch(() => {});
+  useEffect(() => { loadAlbumReviews(); }, []);
+  const reviewFor = (event) => albumReviews.find((review) => review.eventId === event.eventId);
 
   useEffect(() => {
     let cancelled = false;
@@ -2589,6 +2593,16 @@ function CustomerPortalPage({ customer, onLogout }) {
       </section>
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="form-success" role="status">{notice}</p>}
+      {albumReviews.map((review) => {
+        const event = events.find((item) => item.eventId === review.eventId);
+        if (!event) return null;
+        return (
+          <div key={`${review.eventId}-${review.version}`} className="customer-album-review-banner" role="status">
+            <span>✦ Your album design for <b>{event.eventName}</b> (version {review.version}) is ready. Review it, comment on any spread, then approve or ask for changes.</span>
+            <button className="button button-dark button-small" type="button" onClick={() => setDeliveryEvent(event)}>Review album</button>
+          </div>
+        );
+      })}
       <section className="customer-event-section" aria-labelledby="booked-events-title">
         <div className="customer-event-heading">
           <div>
@@ -2626,7 +2640,7 @@ function CustomerPortalPage({ customer, onLogout }) {
                       <button className="customer-id-link" type="button" onClick={() => setLocationEvent(event)}>{event.locationName ? 'Update location' : 'Add location details'}</button>
                     </div></td>
                     <td><button className="button button-dark button-small event-gallery-button" type="button" onClick={() => setGalleryEvent(event)}>{event.albumSubmitted ? 'Open gallery · sent' : 'Open gallery'}</button></td>
-                    <td><button className="button button-quiet button-small" type="button" onClick={() => setDeliveryEvent(event)}>Track</button></td>
+                    <td><button className={`button button-small ${reviewFor(event) ? 'button-dark' : 'button-quiet'}`} type="button" onClick={() => setDeliveryEvent(event)}>{reviewFor(event) ? 'Review album ✦' : 'Track'}</button></td>
                     <td><button className="button button-quiet button-small" type="button" onClick={() => setInviteEvent(event)}>Create ✦</button></td>
                     <td><button className="button button-quiet button-small" type="button" onClick={() => setBillingEvent(event)}>View</button></td>
                   </tr>
@@ -2638,7 +2652,7 @@ function CustomerPortalPage({ customer, onLogout }) {
       </section>
       {locationEvent && <CustomerLocationModal event={locationEvent} busy={locationBusy} error={error} onClose={() => { if (!locationBusy) { setLocationEvent(null); setError(''); } }} onSave={saveLocation} />}
       {billingEvent && <CustomerBillingModal event={billingEvent} onClose={() => setBillingEvent(null)} />}
-      {deliveryEvent && <CustomerDeliveryModal event={deliveryEvent} onClose={() => setDeliveryEvent(null)} />}
+      {deliveryEvent && <CustomerDeliveryModal event={deliveryEvent} onClose={() => { setDeliveryEvent(null); loadAlbumReviews(); }} />}
       {inviteEvent && <InvitationModal event={inviteEvent} onClose={() => setInviteEvent(null)} />}
       {galleryEvent && <CustomerGalleryModal event={galleryEvent} onClose={() => setGalleryEvent(null)} onSubmitted={() => {
         setGalleryEvent(null);
