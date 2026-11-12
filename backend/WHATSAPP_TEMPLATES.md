@@ -13,6 +13,7 @@ Text notification templates are sent as **body-only positional templates**. Put 
 | Team member receives an invitation | `framebucket_team_member_invite` | Utility | `{{1}}` member name; `{{2}}` studio name; `{{3}}` member type; `{{4}}` invitation URL |
 | Customer is told which photographer was assigned to the event | `framebucket_event_assignment_customer` | Utility | `{{1}}` photographer name; `{{2}}` photographer phone; `{{3}}` studio name |
 | Assigned team member receives event details | `framebucket_event_assignment_assignee` | Utility | `{{1}}` event type; `{{2}}` event location; `{{3}}` landmark; `{{4}}` event time; `{{5}}` studio name |
+| Customer changes event location or time in the portal (sent to the assigned photographer, event crew and studio owner, on every change) | `framebucket_event_details_updated` (set `WHATSAPP_EVENT_UPDATE_TEMPLATE`) | Utility | `{{1}}` studio name; `{{2}}` customer name; `{{3}}` event type; `{{4}}` event date; `{{5}}` event location; `{{6}}` landmark; `{{7}}` event time |
 | Customer receives a mobile verification code | `framebucket_mobile_verification` | Authentication | `{{1}}` OTP code in the body; the current sender also sends it to URL button index `0` |
 | Photographer receives the private photo ZIP after album selection is finalized | `framebucket_album_selection_finalized` | Utility | `{{1}}` customer name; `{{2}}` private raw-photo ZIP URL |
 | Guest receives a matched event photo | `framebucket_event_photo_match` | Utility | Image header; body: `{{1}}` guest name; `{{2}}` event type; `{{3}}` photo number |
@@ -58,6 +59,21 @@ Hello, {{1}} ({{2}}) has been assigned as the photographer for your event with {
 ```text
 You have been assigned to a {{1}} event at {{2}} ({{3}}). Event time: {{4}}. Studio: {{5}}.
 ```
+
+### `framebucket_event_details_updated`
+
+```text
+{{1}}: {{2}} has updated the event details.
+
+Event: {{3}} on {{4}}
+Location: {{5}}
+Landmark: {{6}}
+Time: {{7}}
+
+Please plan with the latest details.
+```
+
+Until this template is approved and `WHATSAPP_EVENT_UPDATE_TEMPLATE` is set, each change re-sends `framebucket_event_assignment_assignee` (with the date added to the time) to the assigned photographer and event crew. The studio owner gets the alert only with the dedicated template. No alert is sent when the customer saves without changing anything.
 
 ### `framebucket_album_selection_finalized`
 

@@ -17,6 +17,7 @@ import com.framebucket.gallery.DataGalleryService;
 import com.framebucket.event.repository.EventBookingRepository;
 import com.framebucket.event.repository.EventTypeRepository;
 import com.framebucket.event.notification.EventAssignmentNotice;
+import com.framebucket.event.notification.EventDetailsUpdatedNotice;
 import com.framebucket.team.model.Freelancer;
 import com.framebucket.team.model.MemberType;
 import com.framebucket.team.model.TeamMember;
@@ -49,6 +50,9 @@ public class EventService {
     // Plan features and limits (see com.framebucket.subscription.EntitlementService).
     @org.springframework.beans.factory.annotation.Autowired
     private com.framebucket.subscription.EntitlementService entitlements;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     private final EventBookingRepository eventRepository;
     private final EventTypeRepository eventTypeRepository;
@@ -243,7 +247,16 @@ public class EventService {
         String locationMapUrl = normalizeGoogleMapsUrl(locationName, request.locationMapUrl());
         String landmark = blankToNull(request.landmark());
         String notes = blankToNull(request.notes());
+        boolean changed = !java.util.Objects.equals(event.getLocationName(), locationName)
+                || !java.util.Objects.equals(event.getLocationMapUrl(), locationMapUrl)
+                || !java.util.Objects.equals(event.getLocationLandmark(), landmark)
+                || !java.util.Objects.equals(event.getLocationNotes(), notes)
+                || !java.util.Objects.equals(event.getEventTime(), request.eventTime());
         event.updateLocation(locationName, locationMapUrl, landmark, notes, request.eventTime(), java.time.Instant.now());
+        if (changed) {
+            // Location and time matter to everyone on the shoot: alert them on every change from the portal.
+            eventPublisher.publishEvent(toDetailsUpdatedNotice(event));
+        }
         return toCustomerEventResponse(event);
     }
 
@@ -342,6 +355,69 @@ public class EventService {
                 eventTime,
                 assignee.getName()
         );
+    }
+
+    private EventDetailsUpdatedNotice toDetailsUpdatedNotice(EventBooking event) {
+        PhotographerUser photographer = event.getPhotographer();
+        java.util.Map<String, EventDetailsUpdatedNotice.Recipient> crew = new java.util.LinkedHashMap<>();
+        if (event.getTeamMemberAssignee() != null) {
+            addRecipient(crew, event.getTeamMemberAssignee().getName(), event.getTeamMemberAssignee().getMobileNumber());
+        }
+        if (event.getFreelancerAssignee() != null) {
+            addRecipient(crew, event.getFreelancerAssignee().getName(), event.getFreelancerAssignee().getMobileNumber());
+        }
+        jdbc.query("""
+                SELECT COALESCE(t.name, f.name), COALESCE(t.mobile_number, f.mobile_number)
+                FROM fb_event_crew c
+                LEFT JOIN fb_team_member t ON t.id = c.team_member_id
+                LEFT JOIN fb_freelancer f ON f.id = c.freelancer_id
+                WHERE c.event_id = ? AND c.photographer_id = ?
+                """, rs -> {
+            addRecipient(crew, rs.getString(1), rs.getString(2));
+        }, event.getId(), photographer.getId());
+
+        java.util.Map<String, EventDetailsUpdatedNotice.Recipient> owner = new java.util.LinkedHashMap<>();
+        addRecipient(owner, photographer.getFullName(), photographer.getMobileNumber());
+        EventDetailsUpdatedNotice.Recipient studioOwner = owner.values().stream()
+                .filter(recipient -> !crew.containsKey(recipient.whatsAppNumber()))
+                .findFirst().orElse(null);
+
+        String studioName = blankToNull(photographer.getStudioName()) == null
+                ? photographer.getFullName() : photographer.getStudioName();
+        String eventLocation = blankToNull(event.getLocationName()) == null ? "To be confirmed" : event.getLocationName();
+        if (blankToNull(event.getLocationMapUrl()) != null) {
+            eventLocation += " — " + event.getLocationMapUrl();
+        }
+        String eventTime = event.getEventTime() == null
+                ? "To be confirmed"
+                : event.getEventTime().format(DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH));
+        String eventDate = event.getEventDate() == null
+                ? "Date to be confirmed"
+                : event.getEventDate().format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH));
+        return new EventDetailsUpdatedNotice(
+                List.copyOf(crew.values()),
+                studioOwner,
+                studioName,
+                event.getCustomer().getName(),
+                event.getEventType().getName(),
+                eventDate,
+                eventLocation,
+                blankToNull(event.getLocationLandmark()) == null ? "Not provided" : event.getLocationLandmark(),
+                eventTime
+        );
+    }
+
+    private static void addRecipient(java.util.Map<String, EventDetailsUpdatedNotice.Recipient> recipients,
+                                     String name, String mobileNumber) {
+        if (mobileNumber == null || mobileNumber.isBlank()) {
+            return;
+        }
+        try {
+            String number = whatsappNumber(mobileNumber);
+            recipients.putIfAbsent(number, new EventDetailsUpdatedNotice.Recipient(name == null ? "crew member" : name, number));
+        } catch (IllegalArgumentException ignored) {
+            // A number that isn't a valid Indian mobile can't receive WhatsApp; skip it.
+        }
     }
 
     private static String whatsappNumber(String mobileNumber) {
