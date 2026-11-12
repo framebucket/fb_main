@@ -7,6 +7,7 @@ import { PlanCheckout, PlanUsageCard, PricingPlans, UpgradeNotice, hasFeature } 
 import AdminApp from './Admin.jsx';
 import { EnquireFormPage, EnquiryBookingCell, LeadCaptureSettings, QuoteCatalogSettings, QuoteContractSection, QuotePackagePicker, StudioMark, brandStyle, useEnquiryTracking } from './Bookings.jsx';
 import { BrandingSettings, CustomerDeliveryModal, EditingStyleSettings, EventWorkspaceModal } from './Delivery.jsx';
+import { InvitationModal } from './Invitation.jsx';
 import { CrewPanel } from './Crew.jsx';
 import { InsightsPanel } from './Insights.jsx';
 import { BillingPanel, CalendarPanel, CustomerBillingModal, FlipbookPage, PublicPortfolioPage, ShowcasePanel, StudioSettingsPanel, useCustomerDownloadPolicy } from './Studio.jsx';
@@ -2526,6 +2527,7 @@ function CustomerPortalPage({ customer, onLogout }) {
   const [galleryEvent, setGalleryEvent] = useState(null);
   const [billingEvent, setBillingEvent] = useState(null);
   const [deliveryEvent, setDeliveryEvent] = useState(null);
+  const [inviteEvent, setInviteEvent] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -2606,7 +2608,7 @@ function CustomerPortalPage({ customer, onLogout }) {
         ) : (
           <div className="customer-table-scroll">
             <table className="customer-table customer-event-table">
-              <thead><tr><th scope="col">Event</th><th scope="col">Photographer</th><th scope="col">Event date</th><th scope="col">Time</th><th scope="col">Status</th><th scope="col">Assignee</th><th scope="col">Location</th><th scope="col">Photo Gallery</th><th scope="col">Delivery</th><th scope="col">Payments & albums</th></tr></thead>
+              <thead><tr><th scope="col">Event</th><th scope="col">Photographer</th><th scope="col">Event date</th><th scope="col">Time</th><th scope="col">Status</th><th scope="col">Assignee</th><th scope="col">Location</th><th scope="col">Photo Gallery</th><th scope="col">Delivery</th><th scope="col">Invitation</th><th scope="col">Payments & albums</th></tr></thead>
               <tbody>
                 {events.map((event, index) => (
                   <tr key={event.eventId || `${event.eventName}-${event.eventDate}-${index}`}>
@@ -2625,6 +2627,7 @@ function CustomerPortalPage({ customer, onLogout }) {
                     </div></td>
                     <td><button className="button button-dark button-small event-gallery-button" type="button" onClick={() => setGalleryEvent(event)}>{event.albumSubmitted ? 'Open gallery · sent' : 'Open gallery'}</button></td>
                     <td><button className="button button-quiet button-small" type="button" onClick={() => setDeliveryEvent(event)}>Track</button></td>
+                    <td><button className="button button-quiet button-small" type="button" onClick={() => setInviteEvent(event)}>Create ✦</button></td>
                     <td><button className="button button-quiet button-small" type="button" onClick={() => setBillingEvent(event)}>View</button></td>
                   </tr>
                 ))}
@@ -2636,6 +2639,7 @@ function CustomerPortalPage({ customer, onLogout }) {
       {locationEvent && <CustomerLocationModal event={locationEvent} busy={locationBusy} error={error} onClose={() => { if (!locationBusy) { setLocationEvent(null); setError(''); } }} onSave={saveLocation} />}
       {billingEvent && <CustomerBillingModal event={billingEvent} onClose={() => setBillingEvent(null)} />}
       {deliveryEvent && <CustomerDeliveryModal event={deliveryEvent} onClose={() => setDeliveryEvent(null)} />}
+      {inviteEvent && <InvitationModal event={inviteEvent} onClose={() => setInviteEvent(null)} />}
       {galleryEvent && <CustomerGalleryModal event={galleryEvent} onClose={() => setGalleryEvent(null)} onSubmitted={() => {
         setGalleryEvent(null);
         setEvents((current) => current.map((event) => event.eventId === galleryEvent.eventId ? { ...event, albumSubmitted: true } : event));

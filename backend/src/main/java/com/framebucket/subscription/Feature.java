@@ -18,6 +18,8 @@ public enum Feature {
     PORTFOLIO("Public photography portfolio page"),
     E_ALBUM("E-album flipbooks"),
     ALBUM_PROOFING("Album design proofing with client comments"),
+    AI_ALBUM_DESIGN("AI album auto-design with print JPEGs and layered Photoshop files"),
+    AI_INVITATIONS("AI wedding invitations for your clients (5 designs, animated video)"),
     FILMS("Film and video delivery (teasers, highlights, full films)"),
     WATERMARK("Watermarked gallery previews"),
     CREW_PAYOUTS("Crew scheduling, clash alerts and payouts"),

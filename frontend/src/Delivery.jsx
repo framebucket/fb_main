@@ -179,6 +179,110 @@ function FilmsTab({ eventId, user }) {
   );
 }
 
+const DESIGN_STATUS = { QUEUED: 'Waiting to start', PROCESSING: 'Designing', READY: 'Ready', FAILED: 'Failed' };
+const RECIPE_LABEL = { panorama: 'Panorama', 'hero-ghost': 'Feature photo', 'two-heroes': 'Two features', 'hero-page': 'Feature + collage', 'two-grids': 'Collage', grid: 'Collage' };
+
+// AI album auto-design: lay out the client's submitted selection into print-ready spreads.
+function AutoDesignPanel({ eventId, user, onSent }) {
+  const allowed = hasFeature(user, 'AI_ALBUM_DESIGN');
+  const designs = useLoad(() => (allowed ? api.albumDesigns(eventId) : Promise.resolve(null)), [eventId, allowed]);
+  const [data, setData] = useState(null);
+  const [form, setForm] = useState({ submissionId: '', size: '12x36', custom: '', sheets: 30, dpi: 300 });
+  const [openDesign, setOpenDesign] = useState(null);
+  const [spread, setSpread] = useState(0);
+  const [message, setMessage] = useState('');
+  const { busy, run, messages } = useAction();
+  useEffect(() => {
+    if (!designs.data) return;
+    setData(designs.data);
+    const first = designs.data.submissions?.[0];
+    if (first) setForm((f) => (f.submissionId ? f : { ...f, submissionId: first.submission_id, sheets: Math.max(10, Math.min(40, Math.round(first.photo_count / 5))) }));
+  }, [designs.data]);
+  const working = (data?.submissions || []).flatMap((s) => s.designs).some((d) => d.status === 'QUEUED' || d.status === 'PROCESSING');
+  useEffect(() => {
+    if (!working) return undefined;
+    const timer = setInterval(() => api.albumDesigns(eventId).then(setData).catch(() => {}), 4000);
+    return () => clearInterval(timer);
+  }, [working, eventId]);
+
+  if (!allowed) return <UpgradeNotice feature="AI_ALBUM_DESIGN" title="AI album design">Turn your client's album selection into print-ready spreads in minutes — preview JPEGs, print files and layered Photoshop files to fine-tune.</UpgradeNotice>;
+  if (!data) return <p className="customer-empty">{designs.error || 'Loading album selections…'}</p>;
+  const submissions = data.submissions || [];
+  const all = submissions.flatMap((s) => s.designs.map((d) => ({ ...d, photoCount: s.photo_count })));
+  const shown = all.find((d) => d.design_id === openDesign) || all.find((d) => d.status === 'READY');
+  const size = form.size === 'custom' ? form.custom : form.size;
+  const [h, w] = size.split(/x/i).map(Number);
+  const selected = submissions.find((s) => s.submission_id === form.submissionId);
+  const perSpread = selected ? (selected.photo_count / Math.max(1, form.sheets)).toFixed(1) : null;
+
+  return (
+    <section className="customer-list-section growth-autodesign">
+      <div className="customer-list-heading"><div><p className="eyebrow">AI album design</p><h3 className="studio-h3">Design the album from the client's selection</h3>
+        <p className="event-form-note">Photos are placed in time order, scenes kept together, faces never cropped or put on the centre fold. Your editing style is applied; the logo is not.</p></div></div>
+      {messages}
+      {submissions.length === 0 ? <p className="customer-empty">Your client hasn't submitted their album selection yet. Once they do, you can design the album here.</p> : (
+        <form className="studio-form" onSubmit={async (e) => {
+          e.preventDefault();
+          const r = await run(() => api.createAlbumDesign(eventId, { submissionId: form.submissionId, size, sheets: Number(form.sheets), dpi: Number(form.dpi) }), 'Designing your album — this takes about a minute per 10 spreads.');
+          if (r) { setOpenDesign(r.design_id); api.albumDesigns(eventId).then(setData); }
+        }}>
+          <label className="event-form-label">Album selection<select required value={form.submissionId} onChange={(e) => setForm({ ...form, submissionId: e.target.value })}>
+            {submissions.map((s) => <option key={s.submission_id} value={s.submission_id}>{shortDate(s.created_at.slice(0, 10))} · {s.photo_count} photos</option>)}
+          </select></label>
+          <label className="event-form-label">Album size (height × open spread, inches)<select value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })}>
+            {(data.sizes || []).map((s) => <option key={s} value={s}>{s.replace('x', ' × ')}</option>)}
+            <option value="custom">Custom…</option>
+          </select></label>
+          {form.size === 'custom' && <label className="event-form-label">Custom size<input required pattern="\d{1,2}(\.\d)?\s*[xX]\s*\d{2}(\.\d)?" placeholder="12x40" value={form.custom} onChange={(e) => setForm({ ...form, custom: e.target.value })} /></label>}
+          <label className="event-form-label">Sheets (1 sheet = 1 spread)<input type="number" min="1" max="120" required value={form.sheets} onChange={(e) => setForm({ ...form, sheets: e.target.value })} />{perSpread && <span className="field-hint">≈ {perSpread} photos per spread</span>}</label>
+          <label className="event-form-label">Print resolution<select value={form.dpi} onChange={(e) => setForm({ ...form, dpi: e.target.value })}>
+            <option value="300">300 ppi (lab quality)</option><option value="240">240 ppi</option><option value="200">200 ppi (smaller files)</option>
+          </select>{h && w ? <span className="field-hint">Each spread {Math.round(w * form.dpi)} × {Math.round(h * form.dpi)} px</span> : null}</label>
+          <div className="event-form-actions studio-span-2"><button className="button button-dark" type="submit" disabled={busy || working || !form.submissionId}>{working ? 'Designing…' : 'Design album'}</button></div>
+        </form>
+      )}
+      {all.length > 0 && (
+        <div className="growth-design-list">{all.map((d) => (
+          <button key={d.design_id} type="button" className={`growth-design-chip${shown?.design_id === d.design_id ? ' is-active' : ''}`} onClick={() => { setOpenDesign(d.design_id); setSpread(0); }}>
+            v{d.version} · {d.size_label} · {d.sheets} sheets · <strong>{DESIGN_STATUS[d.status]}{d.status === 'PROCESSING' ? ` ${d.progress}%` : ''}</strong>
+          </button>
+        ))}</div>
+      )}
+      {all.filter((d) => d.status === 'PROCESSING' || d.status === 'QUEUED').map((d) => (
+        <div key={d.design_id} className="growth-progress"><span style={{ width: `${Math.max(3, d.progress)}%` }} /></div>
+      ))}
+      {all.filter((d) => d.status === 'FAILED').slice(0, 1).map((d) => <p key={d.design_id} className="form-error">Version {d.version} failed: {d.error}</p>)}
+      {shown && shown.status === 'READY' && (
+        <div className="growth-design-view">
+          <div className="growth-review-stage">
+            <button className="button button-quiet button-small" type="button" disabled={spread <= 0} onClick={() => setSpread(spread - 1)} aria-label="Previous spread">‹</button>
+            <img src={api.albumDesignSpreadUrl(eventId, shown.design_id, spread)} alt={`Spread ${spread + 1} of ${shown.spreads.length}`} />
+            <button className="button button-quiet button-small" type="button" disabled={spread >= shown.spreads.length - 1} onClick={() => setSpread(spread + 1)} aria-label="Next spread">›</button>
+          </div>
+          <p className="event-form-note">Spread {spread + 1} of {shown.spreads.length} · {RECIPE_LABEL[shown.spreads[spread]?.recipe] || 'Collage'} · photos {shown.spreads[spread]?.photos.join(', ')}</p>
+          <div className="growth-design-thumbs">{shown.spreads.map((s, i) => (
+            <button key={i} type="button" className={i === spread ? 'is-active' : ''} onClick={() => setSpread(i)}><img loading="lazy" src={api.albumDesignSpreadUrl(eventId, shown.design_id, i)} alt={`Spread ${i + 1}`} /></button>
+          ))}</div>
+          <div className="event-form-actions">
+            <a className="button button-quiet" href={api.albumDesignDownloadUrl(eventId, shown.design_id, 'jpeg')}>Download print JPEGs (ZIP)</a>
+            <a className="button button-quiet" href={api.albumDesignDownloadUrl(eventId, shown.design_id, 'psd')}>Download Photoshop PSDs (ZIP)</a>
+          </div>
+          {hasFeature(user, 'ALBUM_PROOFING') && (
+            <form className="studio-form" onSubmit={async (e) => {
+              e.preventDefault();
+              const r = await run(() => api.sendAlbumDesign(eventId, shown.design_id, message), (res) => `Sent to your client as proof version ${res[0].version}.`);
+              if (r) { onSent(r); setMessage(''); }
+            }}>
+              <label className="event-form-label studio-span-2">Send this design to the client for review<input maxLength="1000" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Here's the first draft of your album — comment on any spread." /></label>
+              <div className="event-form-actions studio-span-2"><button className="button button-dark" type="submit" disabled={busy}>Send to client</button></div>
+            </form>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ProofsTab({ eventId, user }) {
   const proofs = useLoad(() => api.proofs(eventId), [eventId]);
   const folders = useLoad(() => api.dataFolders(eventId).then((r) => r?.folders || []).catch(() => []), [eventId]);
@@ -210,6 +314,7 @@ function ProofsTab({ eventId, user }) {
   const latest = list[0];
   return (
     <div className="growth-stack">
+      <AutoDesignPanel eventId={eventId} user={user} onSent={setList} />
       {messages}
       <form className="studio-form customer-list-section" onSubmit={async (e) => {
         e.preventDefault();

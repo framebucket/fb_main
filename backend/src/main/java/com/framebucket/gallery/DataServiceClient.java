@@ -293,6 +293,100 @@ public class DataServiceClient {
         ));
     }
 
+    // ---- customer wedding invitations ----
+
+    public Map<String, Object> invitation(String eventId, String photographerId, String customerId) {
+        return getJson(query("/api/v1/events/" + eventId + "/invitation",
+                "photographer_id", photographerId, "customer_id", customerId));
+    }
+
+    public Map<String, Object> saveInvitation(String eventId, String photographerId, String customerId, Map<String, Object> details) {
+        return putJson(uri("/api/v1/events/" + eventId + "/invitation"),
+                Map.of("photographer_id", photographerId, "customer_id", customerId, "details", details));
+    }
+
+    public Map<String, Object> saveInvitationPhoto(String eventId, String photographerId, String customerId, NamedBytes photo) {
+        URI target = query("/api/v1/events/" + eventId + "/invitation/photo",
+                "photographer_id", photographerId, "customer_id", customerId);
+        return exchange(() -> {
+            MultiValueMap<String, Object> multipart = new LinkedMultiValueMap<>();
+            multipart.add("file", filePart("file", photo));
+            return restClient.post().uri(target).header(SERVICE_KEY_HEADER, token())
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(multipart).retrieve().body(JSON_MAP);
+        });
+    }
+
+    public Map<String, Object> deleteInvitationPhoto(String eventId, String photographerId, String customerId) {
+        return sendJson(query("/api/v1/events/" + eventId + "/invitation/photo",
+                "photographer_id", photographerId, "customer_id", customerId), "DELETE", Map.of());
+    }
+
+    public Map<String, Object> generateInvitationDesigns(String eventId, String photographerId, String customerId) {
+        return postJson("/api/v1/events/" + eventId + "/invitation/designs",
+                Map.of("photographer_id", photographerId, "customer_id", customerId));
+    }
+
+    public MediaStream invitationDesign(String eventId, String customerId, int index) {
+        return openStream(query("/api/v1/events/" + eventId + "/invitation/designs/" + index,
+                "customer_id", customerId), "inline", null);
+    }
+
+    public Map<String, Object> finalizeInvitation(String eventId, String photographerId, String customerId, int index) {
+        return postJson("/api/v1/events/" + eventId + "/invitation/finalize",
+                Map.of("photographer_id", photographerId, "customer_id", customerId, "index", index));
+    }
+
+    public MediaStream invitationFile(String eventId, String customerId, String kind, String range) {
+        return openStream(query("/api/v1/events/" + eventId + "/invitation/" + kind,
+                "customer_id", customerId), "attachment", range);
+    }
+
+    // ---- album auto-design ----
+
+    public Map<String, Object> albumDesigns(String eventId, String photographerId, String customerId) {
+        return getJson(query("/api/v1/events/" + eventId + "/album-designs",
+                "photographer_id", photographerId, "customer_id", customerId));
+    }
+
+    public Map<String, Object> createAlbumDesign(String eventId, String photographerId, String customerId,
+                                                 String submissionId, double heightIn, double widthIn,
+                                                 int sheets, int dpi, String sizeLabel) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("photographer_id", photographerId);
+        body.put("customer_id", customerId);
+        body.put("submission_id", submissionId);
+        body.put("height_in", heightIn);
+        body.put("width_in", widthIn);
+        body.put("sheets", sheets);
+        body.put("dpi", dpi);
+        body.put("size_label", sizeLabel);
+        return postJson("/api/v1/events/" + eventId + "/album-designs", body);
+    }
+
+    public Map<String, Object> albumDesign(String eventId, String designId, String photographerId, String customerId) {
+        return getJson(query("/api/v1/events/" + eventId + "/album-designs/" + designId,
+                "photographer_id", photographerId, "customer_id", customerId));
+    }
+
+    public MediaStream albumDesignSpread(String eventId, String designId, int index,
+                                         String photographerId, String customerId) {
+        return openStream(query("/api/v1/events/" + eventId + "/album-designs/" + designId + "/spreads/" + index,
+                "photographer_id", photographerId, "customer_id", customerId), "inline", null);
+    }
+
+    /** The archive as a stream, or a short-lived direct URL (MediaStream with status 302 and the URL in contentRange). */
+    public MediaStream albumDesignArchive(String eventId, String designId, String kind,
+                                          String photographerId, String customerId) {
+        return openStream(query("/api/v1/events/" + eventId + "/album-designs/" + designId + "/download/" + kind,
+                "photographer_id", photographerId, "customer_id", customerId), "attachment", null, true);
+    }
+
+    public Map<String, Object> publishAlbumDesign(String eventId, String designId, String photographerId, String customerId) {
+        return postJson("/api/v1/events/" + eventId + "/album-designs/" + designId + "/publish",
+                Map.of("photographer_id", photographerId, "customer_id", customerId));
+    }
+
     public MediaStream openPreview(String eventId, String mediaId, String customerId, String range) {
         return openStream(query("/api/v1/events/" + eventId + "/photos/" + mediaId + "/preview",
                 "customer_id", customerId), "inline", range);
@@ -413,13 +507,24 @@ public class DataServiceClient {
     }
 
     private MediaStream openStream(URI uri, String defaultDisposition, String range) {
+        return openStream(uri, defaultDisposition, range, false);
+    }
+
+    private MediaStream openStream(URI uri, String defaultDisposition, String range, boolean allowRedirect) {
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(uri)
-                .timeout(Duration.ofMinutes(10))
+                .timeout(Duration.ofMinutes(allowRedirect ? 60 : 10))
                 .header(SERVICE_KEY_HEADER, token());
         if (range != null && !range.isBlank()) requestBuilder.header(HttpHeaders.RANGE, range);
         HttpRequest request = requestBuilder.GET().build();
         try {
             HttpResponse<InputStream> response = STREAM_CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            if (allowRedirect && response.statusCode() == 302) {
+                response.body().close();
+                String location = response.headers().firstValue(HttpHeaders.LOCATION).orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.BAD_GATEWAY, "The data service sent an empty redirect."));
+                return new MediaStream(302, MediaType.APPLICATION_OCTET_STREAM_VALUE, defaultDisposition, location, null, -1L,
+                        InputStream.nullInputStream());
+            }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 String message;
                 try (InputStream body = response.body()) {
