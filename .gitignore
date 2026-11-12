@@ -13,3 +13,6 @@ frontend/.env.local
 *.iml
 .DS_Store
 Thumbs.db
+
+# End-to-end test output
+e2e/out/
