@@ -25,6 +25,10 @@ import java.util.Locale;
  */
 @Component
 public class EventReminderScheduler {
+    // Plan features and limits (see com.framebucket.subscription.EntitlementService).
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.subscription.EntitlementService entitlements;
+
     private static final Logger LOGGER = LoggerFactory.getLogger(EventReminderScheduler.class);
     private static final ZoneId STUDIO_ZONE = ZoneId.of("Asia/Kolkata");
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy", Locale.ENGLISH);
@@ -71,6 +75,7 @@ public class EventReminderScheduler {
         for (EventInfo event : due) {
             try {
                 if (!profiles.profile(event.photographerId()).remindersEnabled()) continue;
+                if (!entitlements.has(event.photographerId(), com.framebucket.subscription.Feature.REMINDERS)) continue;
                 if (!claim(event)) continue;
                 send(event);
             } catch (RuntimeException exception) {

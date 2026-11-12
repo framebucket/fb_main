@@ -60,6 +60,10 @@ import java.util.stream.Stream;
 
 @Service
 public class EnquiryService {
+    // Plan features and limits (see com.framebucket.subscription.EntitlementService).
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.subscription.EntitlementService entitlements;
+
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final DateTimeFormatter ENQUIRY_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSSSSSSSS", Locale.ROOT);
 
@@ -165,6 +169,7 @@ public class EnquiryService {
         Customer customer = existingCustomer(enquiry);
         boolean created = customer == null;
         if (created) {
+            entitlements.requireCanAddCustomer(photographer.getId());
             int customerSequence;
             try {
                 customerSequence = photographer.allocateCustomerSequence();
@@ -256,9 +261,11 @@ public class EnquiryService {
         Quotation quotation = quotationRepository.findByEnquiry_Id(enquiry.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Wait for the customer to submit a quotation first."));
 
+        entitlements.requireCanAddUpcomingEvent(photographer.getId(), request.eventDate());
         Customer customer = existingCustomer(enquiry);
         boolean customerCreated = customer == null;
         if (customerCreated) {
+            entitlements.requireCanAddCustomer(photographer.getId());
             if (request.dateOfBirth() == null || request.address() == null || request.address().isBlank()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter the new customer's date of birth and address.");
             }

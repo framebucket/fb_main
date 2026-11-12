@@ -42,6 +42,10 @@ import java.util.UUID;
 /** Photographer endpoints for studio settings, billing, expenses, portfolio and e-album flipbooks. */
 @RestController
 public class StudioController {
+    // Plan features (see com.framebucket.subscription.EntitlementService).
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.subscription.EntitlementService entitlements;
+
     private final StudioProfileService profiles;
     private final BillingService billing;
     private final PortfolioService portfolio;
@@ -86,6 +90,7 @@ public class StudioController {
     public PaymentResponse recordPayment(@AuthenticationPrincipal PhotographerPrincipal photographer,
                                          @PathVariable UUID eventId,
                                          @Valid @RequestBody PaymentCreateRequest request) {
+        entitlements.require(photographer.getId(), com.framebucket.subscription.Feature.BILLING);
         return billing.recordPayment(photographer.getId(), eventId, request);
     }
 
@@ -106,6 +111,7 @@ public class StudioController {
     public ResponseEntity<byte[]> paymentQr(@AuthenticationPrincipal PhotographerPrincipal photographer,
                                             @PathVariable UUID eventId,
                                             @RequestParam(required = false) BigDecimal amount) {
+        entitlements.require(photographer.getId(), com.framebucket.subscription.Feature.BILLING);
         return png(billing.paymentQrForPhotographer(photographer.getId(), eventId, amount));
     }
 
@@ -113,6 +119,9 @@ public class StudioController {
     public DownloadPolicyResponse updateDownloadPolicy(@AuthenticationPrincipal PhotographerPrincipal photographer,
                                                        @PathVariable UUID eventId,
                                                        @Valid @RequestBody DownloadPolicyRequest request) {
+        if (request.mode() == StudioDtos.DownloadMode.PAID) {
+            entitlements.require(photographer.getId(), com.framebucket.subscription.Feature.PAID_DOWNLOADS);
+        }
         return billing.updateDownloadPolicy(photographer.getId(), eventId, request);
     }
 
@@ -129,12 +138,14 @@ public class StudioController {
     @ResponseStatus(HttpStatus.CREATED)
     public ExpenseResponse createExpense(@AuthenticationPrincipal PhotographerPrincipal photographer,
                                          @Valid @RequestBody ExpenseRequest request) {
+        entitlements.require(photographer.getId(), com.framebucket.subscription.Feature.BILLING);
         return billing.saveExpense(photographer.getId(), null, request);
     }
 
     @PutMapping("/api/studio/expenses/{expenseId}")
     public ExpenseResponse updateExpense(@AuthenticationPrincipal PhotographerPrincipal photographer,
                                          @PathVariable UUID expenseId, @Valid @RequestBody ExpenseRequest request) {
+        entitlements.require(photographer.getId(), com.framebucket.subscription.Feature.BILLING);
         return billing.saveExpense(photographer.getId(), expenseId, request);
     }
 
@@ -154,7 +165,7 @@ public class StudioController {
     @PostMapping("/api/studio/portfolio")
     public List<PortfolioItemResponse> addPortfolioItems(@AuthenticationPrincipal PhotographerPrincipal photographer,
                                                          @Valid @RequestBody PortfolioItemRequest request) {
-        requireDataModule(photographer);
+        entitlements.require(photographer.getId(), com.framebucket.subscription.Feature.PORTFOLIO);
         return portfolio.add(photographer.getId(), request);
     }
 
@@ -182,7 +193,7 @@ public class StudioController {
     @GetMapping("/api/events/{eventId}/flipbooks/customer-selection")
     public List<String> customerSelection(@AuthenticationPrincipal PhotographerPrincipal photographer,
                                           @PathVariable UUID eventId) {
-        requireDataModule(photographer);
+        entitlements.require(photographer.getId(), com.framebucket.subscription.Feature.E_ALBUM);
         return flipbooks.customerSelection(photographer.getId(), eventId);
     }
 
@@ -190,7 +201,7 @@ public class StudioController {
     @ResponseStatus(HttpStatus.CREATED)
     public FlipbookResponse createFlipbook(@AuthenticationPrincipal PhotographerPrincipal photographer,
                                            @PathVariable UUID eventId, @Valid @RequestBody FlipbookRequest request) {
-        requireDataModule(photographer);
+        entitlements.require(photographer.getId(), com.framebucket.subscription.Feature.E_ALBUM);
         return flipbooks.create(photographer.getId(), eventId, request);
     }
 
@@ -198,7 +209,7 @@ public class StudioController {
     public FlipbookResponse updateFlipbook(@AuthenticationPrincipal PhotographerPrincipal photographer,
                                            @PathVariable UUID eventId, @PathVariable UUID flipbookId,
                                            @Valid @RequestBody FlipbookRequest request) {
-        requireDataModule(photographer);
+        entitlements.require(photographer.getId(), com.framebucket.subscription.Feature.E_ALBUM);
         return flipbooks.update(photographer.getId(), eventId, flipbookId, request);
     }
 
@@ -207,12 +218,6 @@ public class StudioController {
     public void deleteFlipbook(@AuthenticationPrincipal PhotographerPrincipal photographer,
                                @PathVariable UUID eventId, @PathVariable UUID flipbookId) {
         flipbooks.delete(photographer.getId(), eventId, flipbookId);
-    }
-
-    private static void requireDataModule(PhotographerPrincipal photographer) {
-        if (!photographer.isDataModuleEnabled()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "The Data module is not included with your current plan.");
-        }
     }
 
     static ResponseEntity<byte[]> pdf(byte[] body, UUID paymentId) {

@@ -29,6 +29,10 @@ import java.util.UUID;
  */
 @Service
 public class FlipbookService {
+    // Plan features and limits (see com.framebucket.subscription.EntitlementService).
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.subscription.EntitlementService entitlements;
+
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private record Row(UUID id, UUID photographerId, UUID eventId, String title, String token, List<String> mediaIds,
@@ -115,7 +119,8 @@ public class FlipbookService {
         Row row = byToken(token);
         EventInfo event = events.byId(row.eventId());
         return new PublicFlipbookResponse(row.title(), event.studioDisplayName(), event.eventTypeName(),
-                event.eventDate(), event.eventTime(), row.mediaIds().size());
+                event.eventDate(), event.eventTime(), row.mediaIds().size(),
+                !entitlements.has(event.photographerId(), com.framebucket.subscription.Feature.CUSTOM_BRANDING));
     }
 
     public ResponseEntity<StreamingResponseBody> page(String token, int pageIndex) {

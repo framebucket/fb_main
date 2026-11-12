@@ -19,6 +19,10 @@ import java.util.UUID;
 
 @Service
 public class PortfolioService {
+    // Plan features and limits (see com.framebucket.subscription.EntitlementService).
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.subscription.EntitlementService entitlements;
+
     private final JdbcTemplate jdbc;
     private final StudioEvents events;
     private final StudioMedia media;
@@ -83,6 +87,7 @@ public class PortfolioService {
     public PublicPortfolioResponse publicPortfolio(String slug) {
         Map<String, Object> studio = publishedStudio(slug);
         UUID photographerId = (UUID) studio.get("photographer_id");
+        boolean poweredBy = !entitlements.has(photographerId, com.framebucket.subscription.Feature.CUSTOM_BRANDING);
         List<PublicPortfolioItem> items = jdbc.query("""
                         SELECT id, caption FROM fb_portfolio_item WHERE photographer_id = ? ORDER BY sort_order, created_at
                         """, (rs, n) -> {
@@ -92,7 +97,7 @@ public class PortfolioService {
                 }, photographerId);
         return new PublicPortfolioResponse((String) studio.get("studio_name"), (String) studio.get("portfolio_headline"),
                 (String) studio.get("portfolio_bio"), (String) studio.get("email"), (String) studio.get("mobile_number"),
-                items);
+                items, poweredBy);
     }
 
     public ResponseEntity<StreamingResponseBody> publicImage(String slug, UUID itemId) {
@@ -116,6 +121,7 @@ public class PortfolioService {
                         FROM fb_studio_profile s JOIN fb_user u ON u.id = s.photographer_id
                         WHERE s.portfolio_slug = ? AND s.portfolio_public AND u.active
                         """, slug).stream().findFirst()
+                .filter(studio -> entitlements.has((UUID) studio.get("photographer_id"), com.framebucket.subscription.Feature.PORTFOLIO))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Portfolio not found."));
     }
 }

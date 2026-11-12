@@ -742,7 +742,7 @@ export function PublicPortfolioPage({ slug }) {
           {data.items[open].caption && <p>{data.items[open].caption}</p>}
         </div>
       )}
-      <footer className="studio-public-footer">Powered by FrameBucket</footer>
+      {data.poweredByFrameBucket !== false && <footer className="studio-public-footer">Powered by FrameBucket</footer>}
     </main>
   );
 }
@@ -812,7 +812,7 @@ export function FlipbookPage({ token }) {
         <button className="button button-dark" type="button" onClick={() => go(1)} disabled={spread >= maxSpread}>Next ›</button>
       </div>
       <div hidden>{preload.filter((i) => i < pageCount).map((i) => <img key={i} src={api.publicFlipbookPageUrl(token, i)} alt="" />)}</div>
-      <footer className="studio-public-footer">Powered by FrameBucket</footer>
+      {data.poweredByFrameBucket !== false && <footer className="studio-public-footer">Powered by FrameBucket</footer>}
     </main>
   );
 }

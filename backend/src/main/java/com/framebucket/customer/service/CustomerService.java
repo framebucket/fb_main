@@ -26,6 +26,10 @@ import java.util.UUID;
 
 @Service
 public class CustomerService {
+    // Plan features and limits (see com.framebucket.subscription.EntitlementService).
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.subscription.EntitlementService entitlements;
+
     private static final BigDecimal ZERO_MONEY = new BigDecimal("0.00");
 
     private final CustomerRepository customerRepository;
@@ -47,6 +51,7 @@ public class CustomerService {
 
     @Transactional
     public CustomerResponse register(PhotographerPrincipal photographer, CustomerRegistrationRequest request) {
+        entitlements.requireCanAddCustomer(photographer.getId());
         var owner = photographerRepository.findByIdForUpdate(photographer.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Photographer account not found."));
         String email = request.email().trim().toLowerCase(Locale.ROOT);

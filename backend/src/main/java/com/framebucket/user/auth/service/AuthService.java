@@ -20,6 +20,11 @@ import java.util.Optional;
 
 @Service
 public class AuthService {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.subscription.EntitlementService entitlementService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.admin.AdminAccess adminAccess;
+
     private final PhotographerUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationService emailVerificationService;
@@ -134,7 +139,9 @@ public class AuthService {
                 principal.getSubscriptionCode(),
                 principal.getSubscriptionName(),
                 principal.getTrialEndsAt(),
-                principal.isDataModuleEnabled()
+                entitlementService.has(principal.getId(), com.framebucket.subscription.Feature.GALLERY),
+                principal.isAdmin(),
+                entitlementService.forPhotographer(principal.getId())
         );
     }
 
@@ -152,7 +159,9 @@ public class AuthService {
                 user.getSubscription() == null ? null : user.getSubscription().getPlanCode(),
                 user.getSubscription() == null ? null : user.getSubscription().getPlanName(),
                 user.getTrialEndsAt(),
-                user.getSubscription() != null && user.getSubscription().isDataModuleEnabled()
+                user.getSubscription() != null && user.getSubscription().isDataModuleEnabled(),
+                adminAccess.isAdmin(user.getEmail()),
+                null
         );
     }
 }

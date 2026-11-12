@@ -25,8 +25,10 @@ public final class PhotographerPrincipal implements UserDetails {
     private final String subscriptionName;
     private final java.time.Instant trialEndsAt;
     private final boolean dataModuleEnabled;
+    private final boolean admin;
 
-    private PhotographerPrincipal(PhotographerUser user) {
+    private PhotographerPrincipal(PhotographerUser user, boolean admin) {
+        this.admin = admin;
         this.id = user.getId();
         this.fullName = user.getFullName();
         this.studioName = user.getStudioName();
@@ -46,7 +48,16 @@ public final class PhotographerPrincipal implements UserDetails {
     }
 
     public static PhotographerPrincipal from(PhotographerUser user) {
-        return new PhotographerPrincipal(user);
+        return new PhotographerPrincipal(user, false);
+    }
+
+    /** @param admin true for FrameBucket owners/admins (APP_ADMIN_EMAILS); adds ROLE_ADMIN. */
+    public static PhotographerPrincipal from(PhotographerUser user, boolean admin) {
+        return new PhotographerPrincipal(user, admin);
+    }
+
+    public boolean isAdmin() {
+        return admin;
     }
 
     public UUID getId() {
@@ -99,7 +110,9 @@ public final class PhotographerPrincipal implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_PHOTOGRAPHER"));
+        return admin
+                ? List.of(new SimpleGrantedAuthority("ROLE_PHOTOGRAPHER"), new SimpleGrantedAuthority("ROLE_ADMIN"))
+                : List.of(new SimpleGrantedAuthority("ROLE_PHOTOGRAPHER"));
     }
 
     @Override

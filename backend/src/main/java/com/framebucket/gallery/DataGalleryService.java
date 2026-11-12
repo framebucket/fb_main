@@ -22,6 +22,10 @@ import java.util.UUID;
 
 @Service
 public class DataGalleryService {
+    // Plan features and limits (see com.framebucket.subscription.EntitlementService).
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.subscription.EntitlementService entitlements;
+
     private static final Logger LOGGER = LoggerFactory.getLogger(DataGalleryService.class);
 
     private final EventBookingRepository events;
@@ -88,6 +92,7 @@ public class DataGalleryService {
     public Map<String, Object> initUpload(UUID eventId, PhotographerPrincipal principal, String folderId,
                                           String filename, long sizeBytes, String contentType) {
         EventBooking event = photographerEvent(eventId, principal);
+        entitlements.requireStorageFor(principal.getId(), sizeBytes);
         ensureProvisioned(event);
         Map<String, Object> grant = new java.util.LinkedHashMap<>(dataService.initUpload(
                 storageEventId(event), principal.getId().toString(), event.getCustomer().getId().toString(),
@@ -258,9 +263,7 @@ public class DataGalleryService {
     }
 
     private EventBooking photographerEvent(UUID eventId, PhotographerPrincipal principal) {
-        if (!principal.isDataModuleEnabled()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "The Data module is not included with your current plan.");
-        }
+        entitlements.require(principal.getId(), com.framebucket.subscription.Feature.GALLERY);
         return events.findByIdAndPhotographer_Id(eventId, principal.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found."));
     }

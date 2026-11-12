@@ -37,6 +37,9 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     private final AuthService authService;
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository securityContextRepository;
@@ -143,6 +146,7 @@ public class AuthController {
             contextHolderStrategy.clearContext();
             throw new AuthenticationServiceException("Unexpected authenticated principal.");
         }
+        jdbcTemplate.update("UPDATE fb_user SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?", photographer.getId());
         return authService.toResponse(photographer);
     }
 

@@ -43,6 +43,10 @@ import java.util.stream.Stream;
 
 @Service
 public class TeamService {
+    // Plan features and limits (see com.framebucket.subscription.EntitlementService).
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.subscription.EntitlementService entitlements;
+
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Duration INVITE_LIFETIME = Duration.ofDays(14);
     private static final Set<String> ALLOWED_LANGUAGES = Set.of(
@@ -89,6 +93,7 @@ public class TeamService {
 
     @Transactional
     public TeamMemberResponse create(PhotographerPrincipal principal, CreateTeamMemberRequest request) {
+        entitlements.requireCanAddTeamMember(principal.getId());
         PhotographerUser photographer = findPhotographer(principal.getId());
         String mobile = normalizeMobile(request.mobileNumber());
         claimContact(principal.getId(), mobile);
@@ -104,6 +109,7 @@ public class TeamService {
 
     @Transactional
     public TeamInviteResponse invite(PhotographerPrincipal principal, InviteTeamMemberRequest request) {
+        entitlements.requireCanAddTeamMember(principal.getId());
         PhotographerUser photographer = findPhotographer(principal.getId());
         String mobile = normalizeMobile(request.mobileNumber());
         claimContact(principal.getId(), mobile);

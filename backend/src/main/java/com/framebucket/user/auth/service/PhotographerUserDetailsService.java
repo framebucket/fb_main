@@ -12,9 +12,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PhotographerUserDetailsService implements UserDetailsService {
     private final PhotographerUserRepository userRepository;
+    private final com.framebucket.admin.AdminAccess adminAccess;
 
-    public PhotographerUserDetailsService(PhotographerUserRepository userRepository) {
+    public PhotographerUserDetailsService(PhotographerUserRepository userRepository,
+                                          com.framebucket.admin.AdminAccess adminAccess) {
         this.userRepository = userRepository;
+        this.adminAccess = adminAccess;
     }
 
     @Override
@@ -24,13 +27,13 @@ public class PhotographerUserDetailsService implements UserDetailsService {
         if (IndianMobileNumber.isValidInput(identifier)) {
             var matchingUsers = userRepository.findAllByMobileNumber(IndianMobileNumber.normalize(identifier));
             if (matchingUsers.size() == 1) {
-                return PhotographerPrincipal.from(matchingUsers.get(0));
+                return PhotographerPrincipal.from(matchingUsers.get(0), adminAccess.isAdmin(matchingUsers.get(0).getEmail()));
             }
             throw new UsernameNotFoundException("Invalid email or mobile number or password.");
         }
 
         return userRepository.findByEmailIgnoreCase(identifier)
-                .map(PhotographerPrincipal::from)
+                .map(user -> PhotographerPrincipal.from(user, adminAccess.isAdmin(user.getEmail())))
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid email or mobile number or password."));
     }
 }

@@ -28,7 +28,7 @@ public final class StudioDtos {
             @Pattern(regexp = UPI_ID_PATTERN, message = "Enter a valid UPI ID, for example studio@okhdfcbank.") String upiId,
             @Size(max = 120) String upiPayeeName,
             @Size(max = 500) String businessAddress,
-            @Pattern(regexp = "^$|^[0-9A-Z]{15}$", message = "GSTIN must be 15 letters/digits.") String gstin,
+            @Pattern(regexp = "^$|^[0-9A-Za-z]{15}$", message = "GSTIN must be 15 letters/digits.") String gstin,
             @Size(max = 500) String receiptFooter,
             @Pattern(regexp = SLUG_PATTERN, message = "Use 3–60 lowercase letters, digits or hyphens for the portfolio address.") String portfolioSlug,
             @Size(max = 160) String portfolioHeadline,
@@ -204,7 +204,8 @@ public final class StudioDtos {
             String bio,
             String contactEmail,
             String contactMobile,
-            List<PublicPortfolioItem> items
+            List<PublicPortfolioItem> items,
+            boolean poweredByFrameBucket
     ) {
     }
 
@@ -239,7 +240,8 @@ public final class StudioDtos {
             String eventTypeName,
             LocalDate eventDate,
             LocalTime eventTime,
-            int pageCount
+            int pageCount,
+            boolean poweredByFrameBucket
     ) {
     }
 }

@@ -3,7 +3,13 @@ import { api } from './api.js';
 import HeroScene from './HeroScene.jsx';
 import { ThemeToggle, useTheme } from './theme.jsx';
 import LocalFolderSync from './LocalFolderSync.jsx';
+import { PlanCheckout, PlanUsageCard, PricingPlans, UpgradeNotice, hasFeature } from './Plans.jsx';
+import AdminApp from './Admin.jsx';
 import { BillingPanel, CalendarPanel, CustomerBillingModal, FlipbookPage, PublicPortfolioPage, ShowcasePanel, StudioSettingsPanel, useCustomerDownloadPolicy } from './Studio.jsx';
+
+function isAdminPath(path) {
+  return path === '/admin' || path.startsWith('/admin/');
+}
 
 function currentPath() {
   return window.location.pathname.replace(/\/+$/, '') || '/';
@@ -13,7 +19,7 @@ export default function App() {
   const [path, setPath] = useState(currentPath);
   const [user, setUser] = useState(null);
   const [customerProfile, setCustomerProfile] = useState(null);
-  const [loadingSession, setLoadingSession] = useState(path === '/dashboard');
+  const [loadingSession, setLoadingSession] = useState(path === '/dashboard' || isAdminPath(path));
   const [loadingCustomerPortal, setLoadingCustomerPortal] = useState(path === '/customer-portal');
   const [notice, setNotice] = useState('');
 
@@ -36,7 +42,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (path !== '/dashboard' || user) {
+    if ((path !== '/dashboard' && !isAdminPath(path)) || user) {
       return undefined;
     }
 
@@ -133,6 +139,31 @@ export default function App() {
     );
   }
 
+  if (isAdminPath(path)) {
+    if (loadingSession || !user) {
+      return <LoadingPage />;
+    }
+    if (!user.admin) {
+      return (
+        <AuthLayout eyebrow="Admin portal" title="Admin access required." subtitle="This area is only for FrameBucket administrators.">
+          <button className="button button-dark button-full" onClick={() => navigate('/dashboard')}>Go to your workspace</button>
+        </AuthLayout>
+      );
+    }
+    return (
+      <AdminApp
+        user={user}
+        section={path.split('/')[2] || 'overview'}
+        navigate={navigate}
+        onLogout={async () => {
+          await api.logout();
+          setUser(null);
+          navigate('/login', true);
+        }}
+      />
+    );
+  }
+
   if (path === '/dashboard') {
     if (loadingSession || !user) {
       return <LoadingPage />;
@@ -204,7 +235,7 @@ function HomePage({ navigate }) {
               Enquiries, quotes, bookings, galleries and album selections for your studio, in one workspace your clients use too.
             </p>
             <div className="lp-hero-actions">
-              <button type="button" className="lp-button lp-button-primary" onClick={() => navigate('/register')}>Start your 7-day free trial</button>
+              <button type="button" className="lp-button lp-button-primary" onClick={() => navigate('/register')}>Start your 14-day free trial</button>
               <button type="button" className="lp-button lp-button-ghost" onClick={() => navigate('/login')}>Log in</button>
             </div>
             <p className="lp-hero-fine">Free for 7 days. Made for independent photographers and small studios.</p>
@@ -310,210 +341,20 @@ function displayEventPrice(price) {
 }
 
 function PricingSection({ navigate }) {
-  const [plans, setPlans] = useState([]);
-  const [billing, setBilling] = useState('MONTHLY');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    api.plans()
-      .then((availablePlans) => {
-        if (!cancelled) setPlans(availablePlans);
-      })
-      .catch((requestError) => {
-        if (!cancelled) setError(requestError.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  return (
-    <section className="pricing-section" id="pricing">
-      <div className="pricing-heading">
-        <div>
-          <h2>Plans that grow with your studio</h2>
-          <p>Every plan starts with a 7-day free trial. Prices are in INR, before GST.</p>
-        </div>
-        <div className="billing-picker" role="group" aria-label="Pricing period">
-          <button className={billing === 'MONTHLY' ? 'selected' : ''} onClick={() => setBilling('MONTHLY')} aria-pressed={billing === 'MONTHLY'}>Monthly</button>
-          <button className={billing === 'YEARLY' ? 'selected' : ''} onClick={() => setBilling('YEARLY')} aria-pressed={billing === 'YEARLY'}>Yearly <span>Save 10%</span></button>
-        </div>
-      </div>
-      {loading && <p className="pricing-message">Loading plans…</p>}
-      {error && <p className="form-error pricing-message">Could not load plans. Make sure the backend and PostgreSQL are running, then refresh. {error}</p>}
-      {!loading && !error && (
-        <>
-          <div className="pricing-grid">
-            {plans.map((plan) => {
-              const selectedPrice = billing === 'YEARLY' ? plan.yearlyPrice : plan.monthlyPrice;
-              return (
-                <article className="pricing-card" key={plan.id}>
-                  <h3>{plan.name}</h3>
-                  <p className="plan-description">{plan.description}</p>
-                  <div className="plan-price">
-                    <strong>{formatInr(selectedPrice)}</strong>
-                    <span>/{billing === 'YEARLY' ? 'year' : 'month'}</span>
-                  </div>
-                  {billing === 'YEARLY' && (
-                    <p className="plan-savings">Save {formatInr(plan.yearlySavings)} per year</p>
-                  )}
-                  <ul>
-                    {plan.features.map((feature) => <li key={feature}>{feature}</li>)}
-                  </ul>
-                  {!plan.dataModuleEnabled && <p className="plan-restriction">Data module is not available on Bronze.</p>}
-                  <button
-                    className="button button-dark button-full"
-                    onClick={() => navigate(`/payment?planCode=${encodeURIComponent(plan.code)}&billing=${billing}`)}
-                  >
-                    Choose {plan.name.replace(' Plan', '')}
-                  </button>
-                </article>
-              );
-            })}
-          </div>
-          <PlanComparisonTable plans={plans} />
-        </>
-      )}
-    </section>
-  );
-}
-
-function PlanComparisonTable({ plans }) {
-  const features = [
-    { label: 'Photoshoot order tracking with customer alerts', key: 'customerOrderTracking' },
-    { label: 'AI image scanning and photo delivery', key: 'aiImageDelivery' },
-    { label: 'Quotation generator and calendar booking', key: 'quotationCalendar' },
-    { label: 'Data module access', key: 'dataModuleEnabled' },
-    { label: 'RAW photo selection for album design', key: 'rawPhotoSelectionEnabled' },
-  ];
-
-  return (
-    <div className="comparison-section">
-      <div className="comparison-heading">
-        <h3>Compare plans</h3>
-        <p>A tick means the feature is included in that subscription.</p>
-      </div>
-      <div className="comparison-scroll">
-        <table className="plan-comparison">
-          <thead>
-            <tr>
-              <th scope="col">Plan details</th>
-              {plans.map((plan) => <th scope="col" key={plan.id}>{plan.name.replace(' Plan', '')}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="comparison-price-row">
-              <th scope="row">Monthly price</th>
-              {plans.map((plan) => <td key={plan.id}>{formatInr(plan.monthlyPrice)}</td>)}
-            </tr>
-            <tr className="comparison-price-row">
-              <th scope="row">Yearly price <span>10% discount</span></th>
-              {plans.map((plan) => <td key={plan.id}>{formatInr(plan.yearlyPrice)}</td>)}
-            </tr>
-            {features.map((feature) => (
-              <tr key={feature.key}>
-                <th scope="row">{feature.label}</th>
-                {plans.map((plan) => {
-                  const included = plan[feature.key] === true;
-                  return (
-                    <td key={plan.id}>
-                      <span className={included ? 'comparison-mark included' : 'comparison-mark excluded'} aria-label={included ? 'Included' : 'Not included'}>
-                        {included ? '✓' : '—'}
-                      </span>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-            <tr>
-              <th scope="row">RAW photo storage</th>
-              {plans.map((plan) => (
-                <td key={plan.id}>{plan.maxStorageGb ? `Up to ${plan.maxStorageGb} GB` : '—'}</td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  return <PricingPlans navigate={navigate} />;
 }
 
 function PaymentPage({ navigate }) {
-  const query = new URLSearchParams(window.location.search);
-  const planCode = query.get('planCode') || '';
-  const [billing, setBilling] = useState(query.get('billing') === 'YEARLY' ? 'YEARLY' : 'MONTHLY');
-  const [plans, setPlans] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    api.plans()
-      .then((availablePlans) => {
-        if (!cancelled) setPlans(availablePlans);
-      })
-      .catch((requestError) => {
-        if (!cancelled) setError(requestError.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  const plan = plans.find((availablePlan) => availablePlan.code === planCode);
-  const subtotal = plan
-    ? Number(billing === 'YEARLY' ? plan.yearlyPrice : plan.monthlyPrice)
-    : 0;
-  const gst = Math.round((subtotal * 0.18 + Number.EPSILON) * 100) / 100;
-  const total = Math.round((subtotal + gst + Number.EPSILON) * 100) / 100;
-
   return (
     <main className="payment-shell">
       <header className="payment-header">
         <Brand />
         <div className="header-actions">
           <ThemeToggle />
-          <button className="button button-quiet button-small" onClick={() => navigate('/')}>Back to pricing</button>
+          <button className="button button-quiet button-small" onClick={() => navigate('/#pricing')}>Back to pricing</button>
         </div>
       </header>
-      <section className="payment-content">
-        <p className="eyebrow">Payment preview</p>
-        <h1>Review your <em>plan.</em></h1>
-        <p className="payment-intro">Choose a billing period and review the price, including 18% GST.</p>
-        {loading && <p className="pricing-message">Loading plan details…</p>}
-        {error && <p className="form-error" role="alert">Could not load plan details. {error}</p>}
-        {!loading && !error && !plan && (
-          <p className="form-error" role="alert">That plan is unavailable. Return to pricing and select an active plan.</p>
-        )}
-        {plan && (
-          <div className="checkout-grid">
-            <section className="checkout-card" aria-label="Order summary">
-              <p className="plan-code">{plan.code}</p>
-              <h2>{plan.name}</h2>
-              <label className="billing-select-label" htmlFor="billing-period">Billing period</label>
-              <select id="billing-period" value={billing} onChange={(event) => setBilling(event.target.value)}>
-                <option value="MONTHLY">Monthly</option>
-                <option value="YEARLY">Yearly · save 10%</option>
-              </select>
-              <dl className="price-breakdown">
-                <div><dt>Plan price{billing === 'YEARLY' ? ' (10% annual discount applied)' : ''}</dt><dd>{formatInr(subtotal)}</dd></div>
-                <div><dt>GST (18%)</dt><dd>{formatInr(gst)}</dd></div>
-                <div className="price-total"><dt>Total</dt><dd>{formatInr(total)}</dd></div>
-              </dl>
-            </section>
-            <section className="gateway-placeholder">
-              <div className="gateway-icon">₹</div>
-              <h2>Payment gateway coming soon</h2>
-              <p>This is a checkout preview. No payment will be collected and your account will remain on its free trial until payment integration is added.</p>
-              <button className="button button-dark button-full" disabled>Payment is not available yet</button>
-            </section>
-          </div>
-        )}
-      </section>
+      <PlanCheckout navigate={navigate} />
     </main>
   );
 }
@@ -966,13 +807,14 @@ function EventGuestCheckinPage({ token }) {
             {deleted && <p className="form-success" role="status">Your face profile has been removed.</p>}
             <p className="guest-checkin-copy">Share your name, WhatsApp number, and a clear selfie. FrameBucket compares the selfie only with photos from this event. The selfie itself is discarded after its face template is created.</p>
             {error && <p className="form-error" role="alert">{error}</p>}
+            {event?.faceRecognitionAvailable === false && <p className="form-error" role="status">Selfie photo matching isn't enabled for this event yet. Please ask the photographer for your photos.</p>}
             <form className="auth-form guest-checkin-form" onSubmit={submit}>
               <label>Your name<input value={form.name} onChange={(changeEvent) => setForm((current) => ({ ...current, name: changeEvent.target.value }))} autoComplete="name" maxLength="120" required placeholder="Name" /></label>
               <label>WhatsApp number<input value={form.mobileNumber} onChange={(changeEvent) => setForm((current) => ({ ...current, mobileNumber: changeEvent.target.value }))} type="tel" autoComplete="tel" pattern="([0-9]{10}|\\+91[0-9]{10})" maxLength="13" required placeholder="9876543210" /><span className="field-hint">Enter 10 digits. You may also include +91.</span></label>
               <label className="guest-selfie-label">Selfie<input ref={selfieInputRef} type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" capture="user" onChange={(changeEvent) => setSelfie(changeEvent.target.files?.[0] || null)} required /><span className="field-hint">JPG or PNG · maximum 8 MB · one face, facing the camera</span>{selfie && <span className="guest-selfie-name">{selfie.name}</span>}</label>
               <label className="guest-consent"><input type="checkbox" checked={form.faceConsent} onChange={(changeEvent) => setForm((current) => ({ ...current, faceConsent: changeEvent.target.checked }))} required /><span>I consent to automated face matching for photos from this event. My face template is used only for this event and can be removed from this page.</span></label>
               <label className="guest-consent"><input type="checkbox" checked={form.whatsappConsent} onChange={(changeEvent) => setForm((current) => ({ ...current, whatsappConsent: changeEvent.target.checked }))} required /><span>I agree to receive my matched event photos at this WhatsApp number.</span></label>
-              <button className="button button-dark button-full" type="submit" disabled={busy}>{busy ? 'Finding your photos…' : 'Upload selfie & find my photos'}</button>
+              <button className="button button-dark button-full" type="submit" disabled={busy || event?.faceRecognitionAvailable === false}>{busy ? 'Finding your photos…' : 'Upload selfie & find my photos'}</button>
               <p className="form-footnote">Your face template is stored for this event until you remove it. Matched photos are sent using FrameBucket’s WhatsApp account.</p>
             </form>
           </>
@@ -1074,6 +916,7 @@ function Dashboard({ user, onLogout }) {
       <header className="dashboard-header">
         <Brand />
         <div className="account-menu">
+          {user.admin && <a className="button button-quiet button-small" href="/admin">Admin portal</a>}
           <ThemeToggle />
           <div className="photographer-profile" ref={profileMenuRef}>
             <button
@@ -1115,6 +958,7 @@ function Dashboard({ user, onLogout }) {
         <h1>Good to have you here, <em>{firstName}.</em></h1>
         <p>Choose where you want to pick up today.</p>
       </section>
+      <PlanUsageCard />
       {error && <p className="form-error dashboard-error" role="alert">{error}</p>}
       <nav className={tabIndicator ? 'module-tabs has-indicator' : 'module-tabs'} aria-label="Workspace modules" ref={tabsRef}>
         {tabIndicator && <span className="module-tab-indicator" aria-hidden="true" style={{ width: tabIndicator.width, transform: `translateX(${tabIndicator.x}px)` }} />}
@@ -1146,10 +990,9 @@ function Dashboard({ user, onLogout }) {
           className={activeTab === 'data' ? 'module-tab active' : 'module-tab'}
           onClick={() => setActiveTab('data')}
           aria-pressed={activeTab === 'data'}
-          disabled={!dataModuleEnabled}
-          title={dataModuleEnabled ? 'Open the Data module' : 'The Data module is not included with Bronze.'}
+          title={dataModuleEnabled ? 'Open the Data module' : 'Online galleries are not included in your current plan.'}
         >
-          Data {!dataModuleEnabled && <span className="tab-lock">Bronze</span>}
+          Data {!dataModuleEnabled && <span className="tab-lock">Upgrade</span>}
         </button>
         <button className={activeTab === 'settings' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('settings')} aria-pressed={activeTab === 'settings'}>
           Settings
@@ -1157,7 +1000,7 @@ function Dashboard({ user, onLogout }) {
       </nav>
       <p className="workflow-sequence">Photography workflow <b>Enquiries</b><span>→</span><b>Customers</b><span>→</span><b>Events</b><span>→</span><b>Team</b><span>→</span><b>Data</b></p>
       <div className="module-stage" key={activeTab}>
-        {activeTab === 'overview' ? <DashboardOverview user={user} /> : activeTab === 'enquiries' ? <EnquiryPanel user={user} /> : activeTab === 'customers' ? <CustomerPanel user={user} /> : activeTab === 'events' ? <EventPanel user={user} onOpenGallery={(event) => { setDataEventId(event.id); setActiveTab('data'); }} /> : activeTab === 'team' ? <TeamPanel user={user} /> : activeTab === 'calendar' ? <CalendarPanel user={user} /> : activeTab === 'billing' ? <BillingPanel user={user} /> : activeTab === 'showcase' ? <ShowcasePanel user={user} /> : activeTab === 'settings' ? <StudioSettingsPanel /> : <DataPanel initialEventId={dataEventId} />}
+        {activeTab === 'overview' ? <DashboardOverview user={user} /> : activeTab === 'enquiries' ? <EnquiryPanel user={user} /> : activeTab === 'customers' ? <CustomerPanel user={user} /> : activeTab === 'events' ? <EventPanel user={user} onOpenGallery={(event) => { setDataEventId(event.id); setActiveTab('data'); }} /> : activeTab === 'team' ? <TeamPanel user={user} /> : activeTab === 'calendar' ? <CalendarPanel user={user} /> : activeTab === 'billing' ? (hasFeature(user, 'BILLING') ? <BillingPanel user={user} /> : <UpgradeNotice feature="BILLING" title="Payments, receipts & expenses">Record client payments, share UPI payment QR codes, send GST receipts and track studio expenses.</UpgradeNotice>) : activeTab === 'showcase' ? (hasFeature(user, 'PORTFOLIO') || hasFeature(user, 'E_ALBUM') ? <ShowcasePanel user={user} /> : <UpgradeNotice feature="PORTFOLIO" title="Portfolio & e-album flipbooks">Publish a public portfolio page and share page-turning e-albums with your clients.</UpgradeNotice>) : activeTab === 'settings' ? <StudioSettingsPanel /> : dataModuleEnabled ? <DataPanel initialEventId={dataEventId} /> : <UpgradeNotice feature="GALLERY" title="Online galleries">Deliver photos online with client selection and downloads.</UpgradeNotice>}
       </div>
       <footer className="dashboard-footer"><Brand /><span>Your growth counts.</span><span>© 2026 FrameBucket</span></footer>
     </main>
@@ -2206,7 +2049,7 @@ function EventPanel({ user, onOpenGallery }) {
                       {event.locationNotes && <small>{event.locationNotes}</small>}
                     </div> : <span className="event-location-missing">Not provided</span>}</td>
                     <td className="album-link-cell">
-                      <button className="button button-dark button-small event-gallery-button" type="button" disabled={!user.dataModuleEnabled} title={user.dataModuleEnabled ? 'Open this event gallery' : 'The Data module is not included with Bronze.'} onClick={() => onOpenGallery(event)}>Gallery</button>
+                      <button className="button button-dark button-small event-gallery-button" type="button" disabled={!user.dataModuleEnabled} title={user.dataModuleEnabled ? 'Open this event gallery' : 'Online galleries are not included in your current plan.'} onClick={() => onOpenGallery(event)}>Gallery</button>
                       {event.eventGallery && <a className="album-design-link" href={event.eventGallery} target="_blank" rel="noreferrer">Designer folder ↗</a>}
                     </td>
                     <td>{new Date(event.createdAt).toLocaleString()}</td>

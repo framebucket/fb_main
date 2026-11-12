@@ -9,7 +9,7 @@ public class SpaController {
             "/", "/register", "/verify-email", "/payment", "/login",
             "/dashboard", "/customer-portal",
             "/quote/{token}", "/team-invite/{token}", "/event-checkin/{token}",
-            "/portfolio/{slug}", "/flipbook/{token}"
+            "/portfolio/{slug}", "/flipbook/{token}", "/admin", "/admin/{section}"
     })
     public String forwardToApp() {
         return "forward:/index.html";

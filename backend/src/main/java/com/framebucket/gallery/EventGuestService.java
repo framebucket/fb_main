@@ -27,6 +27,10 @@ import java.util.UUID;
 
 @Service
 public class EventGuestService {
+    // Plan features and limits (see com.framebucket.subscription.EntitlementService).
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.subscription.EntitlementService entitlements;
+
     private static final Logger LOGGER = LoggerFactory.getLogger(EventGuestService.class);
     private static final long MAX_SELFIE_BYTES = 8L * 1024 * 1024;
 
@@ -50,12 +54,17 @@ public class EventGuestService {
         if (photographerName == null || photographerName.isBlank()) {
             photographerName = event.getPhotographer().getFullName();
         }
-        return new EventContext(event.getEventType().getName(), event.getEventDate(), photographerName);
+        return new EventContext(event.getEventType().getName(), event.getEventDate(), photographerName,
+                entitlements.has(event.getPhotographer().getId(), com.framebucket.subscription.Feature.FACE_RECOGNITION));
     }
 
     public RegistrationResponse register(String token, String name, String mobileNumber,
                                          boolean faceConsent, boolean whatsappConsent, MultipartFile selfie) {
         EventBooking event = eventByToken(token);
+        if (!entitlements.has(event.getPhotographer().getId(), com.framebucket.subscription.Feature.FACE_RECOGNITION)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Face matching isn't enabled for this event. Ask your photographer for the gallery link.");
+        }
         if (!faceConsent || !whatsappConsent) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Consent to event face matching and WhatsApp delivery is required.");

@@ -86,10 +86,14 @@ public class SecurityConfig {
                                 "/team-invite/**",
                                 "/event-checkin/**",
                                 "/portfolio/**",
-                                "/flipbook/**"
+                                "/flipbook/**",
+                                "/admin",
+                                "/admin/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/subscriptions").permitAll()
+                        .requestMatchers("/api/subscriptions/me", "/api/subscriptions/requests/**", "/api/subscriptions/requests").hasRole("PHOTOGRAPHER")
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/auth/register",

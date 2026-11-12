@@ -1,0 +1,9 @@
+.git
+.idea
+**/node_modules
+frontend/dist
+backend/target
+output
+coming-soon-site
+database
+*.md

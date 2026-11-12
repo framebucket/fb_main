@@ -63,7 +63,9 @@ public final class AuthDtos {
             String subscriptionCode,
             String subscriptionName,
             Instant trialEndsAt,
-            boolean dataModuleEnabled
+            boolean dataModuleEnabled,
+            boolean admin,
+            com.framebucket.subscription.Entitlements entitlements
     ) {
     }
 }

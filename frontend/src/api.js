@@ -55,10 +55,25 @@ async function request(path, options = {}) {
 
   if (!response.ok) {
     const message = payload?.detail || payload?.message || 'The request could not be completed.';
-    throw new Error(message);
+    const error = new Error(message);
+    // PLAN_UPGRADE_REQUIRED errors carry the missing feature or the limit that was reached.
+    error.status = response.status;
+    error.code = payload?.code;
+    error.feature = payload?.feature;
+    error.limit = payload?.limit;
+    throw error;
   }
 
   return payload;
+}
+
+function query(params) {
+  const search = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') search.set(key, value);
+  });
+  const text = search.toString();
+  return text ? `?${text}` : '';
 }
 
 async function requestMultipart(path, body) {
@@ -295,6 +310,26 @@ export const api = {
   publicFlipbook: (token) => request(`/api/public/flipbooks/${encodeURIComponent(token)}`),
   publicFlipbookPageUrl: (token, index) => `${apiBase}/api/public/flipbooks/${encodeURIComponent(token)}/pages/${index}`,
   apiUrl: (path) => `${apiBase}${path}`,
+  // Subscription plans
+  mySubscription: () => request('/api/subscriptions/me'),
+  requestPlan: (planCode, billingCycle, message) => request('/api/subscriptions/requests', { method: 'POST', body: { planCode, billingCycle, message } }),
+  cancelPlanRequest: () => request('/api/subscriptions/requests/pending', { method: 'DELETE' }),
+  // Admin portal (ROLE_ADMIN)
+  adminOverview: () => request('/api/admin/overview'),
+  adminPhotographers: (params) => request(`/api/admin/photographers${query(params)}`),
+  adminPhotographer: (id) => request(`/api/admin/photographers/${encodeURIComponent(id)}`),
+  adminChangePlan: (id, body) => request(`/api/admin/photographers/${encodeURIComponent(id)}/plan`, { method: 'PUT', body }),
+  adminExtendTrial: (id, days, note) => request(`/api/admin/photographers/${encodeURIComponent(id)}/trial`, { method: 'POST', body: { days, note } }),
+  adminSuspend: (id, reason) => request(`/api/admin/photographers/${encodeURIComponent(id)}/suspend`, { method: 'POST', body: { reason } }),
+  adminReactivate: (id) => request(`/api/admin/photographers/${encodeURIComponent(id)}/reactivate`, { method: 'POST' }),
+  adminSaveNotes: (id, notes) => request(`/api/admin/photographers/${encodeURIComponent(id)}/notes`, { method: 'PUT', body: { notes } }),
+  adminPlans: () => request('/api/admin/plans'),
+  adminFeatures: () => request('/api/admin/features'),
+  adminUpdatePlan: (code, body) => request(`/api/admin/plans/${encodeURIComponent(code)}`, { method: 'PUT', body }),
+  adminPlanRequests: (status) => request(`/api/admin/plan-requests${query({ status })}`),
+  adminApproveRequest: (id, body) => request(`/api/admin/plan-requests/${encodeURIComponent(id)}/approve`, { method: 'POST', body }),
+  adminRejectRequest: (id, note) => request(`/api/admin/plan-requests/${encodeURIComponent(id)}/reject`, { method: 'POST', body: { note } }),
+  adminAudit: (limit) => request(`/api/admin/audit${query({ limit })}`),
   login: async (form) => {
     const profile = await request('/api/auth/login', { method: 'POST', body: form });
     csrfToken = null;

@@ -46,6 +46,10 @@ import java.util.stream.Stream;
 
 @Service
 public class EventService {
+    // Plan features and limits (see com.framebucket.subscription.EntitlementService).
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.subscription.EntitlementService entitlements;
+
     private final EventBookingRepository eventRepository;
     private final EventTypeRepository eventTypeRepository;
     private final CustomerRepository customerRepository;
@@ -138,6 +142,7 @@ public class EventService {
 
     @Transactional
     public EventResponse createEvent(PhotographerPrincipal photographer, EventCreateRequest request) {
+        entitlements.requireCanAddUpcomingEvent(photographer.getId(), request.eventDate());
         PhotographerUser owner = photographerRepository.findByIdForUpdate(photographer.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Photographer account not found."));
 

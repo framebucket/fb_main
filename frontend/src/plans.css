@@ -1,0 +1,44 @@
+/* Plan & usage card, upgrade prompts and pricing v2. */
+
+.plan-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px; margin: 0 0 22px; padding: 20px 22px; border-radius: 18px; background: var(--fb-raised); border: 1px solid var(--fb-line); box-shadow: var(--fb-shadow-1); }
+.plan-card-warn { border-color: var(--fb-danger-line); }
+.plan-card-info { border-color: var(--fb-brass-line); }
+.plan-card h2 { margin: 4px 0 6px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 1.4rem; }
+.plan-card-note { margin: 0 0 12px; color: var(--fb-text-2); }
+.plan-status { font-size: .74rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--fb-line-strong); color: var(--fb-text-2); }
+.plan-status-ok { color: var(--fb-success); border-color: var(--fb-success-line); background: var(--fb-success-bg); }
+.plan-status-info { color: var(--fb-brass); border-color: var(--fb-brass-line); background: var(--fb-brass-soft); }
+.plan-status-warn { color: var(--fb-danger); border-color: var(--fb-danger-line); background: var(--fb-danger-bg); }
+.plan-card-pending { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--fb-brass-soft); border: 1px solid var(--fb-brass-line); color: var(--fb-text-2); font-size: .92rem; }
+.plan-card-usage { display: grid; gap: 12px; align-content: center; }
+.usage-bar-label { display: flex; justify-content: space-between; gap: 10px; font-size: .86rem; color: var(--fb-muted); margin-bottom: 5px; }
+.usage-bar-label b { color: var(--fb-text); font-weight: 600; }
+.usage-bar-track { height: 7px; border-radius: 999px; background: var(--fb-sunken); overflow: hidden; }
+.usage-bar-track span { display: block; height: 100%; border-radius: inherit; background: var(--fb-brass); transition: width .6s ease; }
+.usage-bar.is-high .usage-bar-track span { background: #d39a3a; }
+.usage-bar.is-full .usage-bar-track span { background: var(--fb-danger); }
+
+.upgrade-notice { display: flex; gap: 20px; align-items: flex-start; max-width: 760px; margin: 30px auto; padding: 28px; border-radius: 20px; background: linear-gradient(140deg, var(--fb-brass-soft), transparent 60%), var(--fb-raised); border: 1px solid var(--fb-brass-line); box-shadow: var(--fb-shadow-1); }
+.upgrade-notice-icon { flex: none; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 14px; background: var(--fb-brass); color: var(--fb-on-brass); font-size: 1.3rem; }
+.upgrade-notice h2 { margin: 4px 0 8px; }
+.upgrade-notice p { color: var(--fb-text-2); }
+.upgrade-notice-plan { color: var(--fb-text) !important; }
+
+.pricing-grid-v2 { align-items: stretch; }
+.pricing-grid-v2 .pricing-card { position: relative; display: flex; flex-direction: column; }
+.pricing-grid-v2 .pricing-card > ul:last-of-type { flex: 1; }
+.pricing-card.is-highlighted { border-color: var(--fb-brass); box-shadow: 0 0 0 1px var(--fb-brass), var(--fb-shadow-2); }
+.pricing-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); padding: 4px 12px; border-radius: 999px; background: var(--fb-brass); color: var(--fb-on-brass); font-size: .74rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+.plan-tagline { margin: 0; color: var(--fb-brass); font-size: .86rem; font-weight: 600; }
+.plan-limits { padding: 10px 0; margin: 4px 0; border-top: 1px solid var(--fb-line); border-bottom: 1px solid var(--fb-line); list-style: none; }
+.plan-limits li::before { content: none !important; }
+.button-gold { background: var(--fb-brass); color: var(--fb-on-brass); border-color: var(--fb-brass); }
+.button-gold:hover { background: var(--fb-brass-strong); }
+.checkout-features { margin: 14px 0 0; padding-left: 18px; color: var(--fb-text-2); font-size: .9rem; }
+.gateway-placeholder textarea { width: 100%; box-sizing: border-box; margin: 6px 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--fb-input); border: 1px solid var(--fb-input-border); color: var(--fb-text); font: inherit; }
+.gateway-placeholder .button + .button { margin-top: 8px; }
+
+@media (max-width: 860px) {
+  .plan-card { grid-template-columns: 1fr; }
+  .upgrade-notice { flex-direction: column; }
+}
