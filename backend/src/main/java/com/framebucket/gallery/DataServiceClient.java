@@ -29,6 +29,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 public class DataServiceClient {
@@ -203,6 +204,68 @@ public class DataServiceClient {
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(multipart).retrieve().body(JSON_MAP);
         });
+    }
+
+    // ---- studio editing look (learned from reference photos) and logo stamping ----
+
+    public Map<String, Object> studioStyle(UUID photographerId) {
+        return getJson(uri("/api/v1/studios/" + photographerId + "/style"));
+    }
+
+    public Map<String, Object> saveStyleReferences(UUID photographerId, List<NamedBytes> references) {
+        return exchange(() -> {
+            MultiValueMap<String, Object> multipart = new LinkedMultiValueMap<>();
+            for (NamedBytes reference : references) {
+                multipart.add("files", filePart("files", reference));
+            }
+            return restClient.post().uri(uri("/api/v1/studios/" + photographerId + "/style/references"))
+                    .header(SERVICE_KEY_HEADER, token())
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(multipart).retrieve().body(JSON_MAP);
+        });
+    }
+
+    public Map<String, Object> updateStyle(UUID photographerId, Map<String, Object> settings) {
+        return putJson(uri("/api/v1/studios/" + photographerId + "/style"), settings);
+    }
+
+    public Map<String, Object> clearStyle(UUID photographerId) {
+        return sendJson(uri("/api/v1/studios/" + photographerId + "/style"), "DELETE", Map.of());
+    }
+
+    public byte[] stylePreview(UUID photographerId, NamedBytes sample, Integer strength) {
+        URI target = strength == null
+                ? uri("/api/v1/studios/" + photographerId + "/style/preview")
+                : query("/api/v1/studios/" + photographerId + "/style/preview", "strength", String.valueOf(strength));
+        String serviceKey = token();
+        try {
+            MultiValueMap<String, Object> multipart = new LinkedMultiValueMap<>();
+            multipart.add("file", filePart("file", sample));
+            return restClient.post().uri(target).header(SERVICE_KEY_HEADER, serviceKey)
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(multipart).retrieve().body(byte[].class);
+        } catch (RestClientResponseException exception) {
+            throw serviceError(exception.getStatusCode().value(), exception.getResponseBodyAsString());
+        } catch (RuntimeException exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "The Python data service is unavailable. Start it on " + baseUrl + ".", exception);
+        }
+    }
+
+    private static HttpEntity<ByteArrayResource> filePart(String field, NamedBytes file) {
+        ByteArrayResource resource = new ByteArrayResource(file.bytes()) {
+            @Override
+            public String getFilename() {
+                return file.filename();
+            }
+        };
+        HttpHeaders partHeaders = new HttpHeaders();
+        partHeaders.setContentDispositionFormData(field, file.filename());
+        partHeaders.setContentType(file.mediaType());
+        return new HttpEntity<>(resource, partHeaders);
+    }
+
+    public record NamedBytes(String filename, MediaType mediaType, byte[] bytes) {
     }
 
     public void deleteGuestFace(String eventId, String guestId, String customerId) {

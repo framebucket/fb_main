@@ -25,7 +25,7 @@ public enum Feature {
     WHATSAPP_AUTOMATION("WhatsApp notifications to clients and team"),
     FACE_RECOGNITION("AI face recognition: guests get their photos on WhatsApp"),
     PAID_DOWNLOADS("Charge customers for photo downloads"),
-    CUSTOM_BRANDING("Your logo and colours, no \"Powered by FrameBucket\""),
+    CUSTOM_BRANDING("Your logo and colours, AI editing style with face-safe logo, no \"Powered by FrameBucket\""),
     INSIGHTS("Business insights dashboard"),
     CUSTOM_DOMAIN("Your own domain for portfolio and galleries"),
     PRIORITY_SUPPORT("Priority support");

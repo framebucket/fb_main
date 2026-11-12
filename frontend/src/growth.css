@@ -160,3 +160,14 @@
 /* Wide studio modals (styles.css loads later and caps .customer-detail-modal at 480px). */
 .customer-detail-modal.studio-modal-wide { width: min(1040px, 94vw); max-width: none; }
 .studio-modal .studio-subtabs { flex-wrap: wrap; }
+
+/* Editing style */
+.growth-style-summary { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.growth-style-summary p { margin: 4px 0 0; color: var(--fb-text-2); font-size: .9rem; }
+.growth-swatches { display: flex; }
+.growth-swatches span { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--fb-raised-2); margin-left: -8px; box-shadow: 0 1px 3px rgba(0, 0, 0, .18); }
+.growth-swatches span:first-child { margin-left: 0; }
+.growth-before-after { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.growth-before-after figure { margin: 0; display: grid; gap: 6px; }
+.growth-before-after img { width: 100%; max-height: 520px; object-fit: contain; border-radius: 12px; background: var(--fb-raised-2); border: 1px solid var(--fb-line); }
+.growth-before-after figcaption { color: var(--fb-muted); font-size: .84rem; font-weight: 600; }

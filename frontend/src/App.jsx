@@ -6,7 +6,7 @@ import LocalFolderSync from './LocalFolderSync.jsx';
 import { PlanCheckout, PlanUsageCard, PricingPlans, UpgradeNotice, hasFeature } from './Plans.jsx';
 import AdminApp from './Admin.jsx';
 import { EnquireFormPage, EnquiryBookingCell, LeadCaptureSettings, QuoteCatalogSettings, QuoteContractSection, QuotePackagePicker, StudioMark, brandStyle, useEnquiryTracking } from './Bookings.jsx';
-import { BrandingSettings, CustomerDeliveryModal, EventWorkspaceModal } from './Delivery.jsx';
+import { BrandingSettings, CustomerDeliveryModal, EditingStyleSettings, EventWorkspaceModal } from './Delivery.jsx';
 import { CrewPanel } from './Crew.jsx';
 import { InsightsPanel } from './Insights.jsx';
 import { BillingPanel, CalendarPanel, CustomerBillingModal, FlipbookPage, PublicPortfolioPage, ShowcasePanel, StudioSettingsPanel, useCustomerDownloadPolicy } from './Studio.jsx';
@@ -236,11 +236,12 @@ function GrowthSettings({ user }) {
   const [tab, setTab] = useState('packages');
   return (
     <section className="event-module studio-panel">
-      <div className="customer-module-intro"><p className="eyebrow">Win more bookings · look premium</p><h2>Bookings &amp; <em>brand.</em></h2><p>Your packages and prices, enquiry links for Instagram, WhatsApp and your website, and your logo, colours, watermark and domain.</p></div>
-      <div className="studio-subtabs">{[['packages', 'Packages & pricing'], ['leads', 'Enquiry links'], ['brand', 'Branding & watermark']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>
+      <div className="customer-module-intro"><p className="eyebrow">Win more bookings · look premium</p><h2>Bookings &amp; <em>brand.</em></h2><p>Your packages and prices, enquiry links for Instagram, WhatsApp and your website, your logo, colours, watermark and domain, and the editing look applied to every photo you upload.</p></div>
+      <div className="studio-subtabs">{[['packages', 'Packages & pricing'], ['leads', 'Enquiry links'], ['brand', 'Branding & watermark'], ['style', 'Editing style & logo']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>
       {tab === 'packages' && <QuoteCatalogSettings user={user} />}
       {tab === 'leads' && (hasFeature(user, 'LEAD_CAPTURE') ? <LeadCaptureSettings /> : <UpgradeNotice feature="LEAD_CAPTURE" title="Enquiry links">Get enquiries straight from Instagram, WhatsApp and your website.</UpgradeNotice>)}
       {tab === 'brand' && <BrandingSettings />}
+      {tab === 'style' && <EditingStyleSettings />}
     </section>
   );
 }

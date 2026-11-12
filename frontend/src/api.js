@@ -97,6 +97,25 @@ async function requestMultipart(path, body) {
   return payload;
 }
 
+async function requestImage(path, body) {
+  if (!csrfToken) {
+    await loadCsrfToken();
+  }
+  const response = await fetch(apiBase + path, {
+    method: 'POST',
+    headers: { 'X-XSRF-TOKEN': csrfToken },
+    credentials: 'include',
+    body,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    let payload = null;
+    try { payload = JSON.parse(text); } catch { payload = { detail: text }; }
+    throw new Error(payload?.detail || payload?.message || `The preview failed (HTTP ${response.status}).`);
+  }
+  return response.blob();
+}
+
 /** Anonymous POST without CSRF/cookies, for the embeddable enquiry form (works inside third-party iframes). */
 async function publicPost(path, body) {
   const response = await fetch(apiBase + path, {
@@ -390,6 +409,11 @@ export const api = {
   setDomain: (domain) => request('/api/studio/brand/domain', { method: 'PUT', body: { domain } }),
   verifyDomain: () => request('/api/studio/brand/domain/verify', { method: 'POST' }),
   removeDomain: () => request('/api/studio/brand/domain', { method: 'DELETE' }),
+  editingStyle: () => request('/api/studio/editing-style'),
+  saveEditingStyle: (body) => request('/api/studio/editing-style', { method: 'PUT', body }),
+  clearEditingStyle: () => request('/api/studio/editing-style', { method: 'DELETE' }),
+  uploadStyleReferences: (files) => { const form = new FormData(); files.forEach((file) => form.append('files', file)); return requestMultipart('/api/studio/editing-style/references', form); },
+  previewEditingStyle: (file, strength) => { const form = new FormData(); form.append('file', file); return requestImage(`/api/studio/editing-style/preview?strength=${encodeURIComponent(strength)}`, form); },
   customerDelivery: (eventId) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/delivery`),
   customerFilmUrl: (eventId, filmId) => `${apiBase}/api/customer-portal/events/${encodeURIComponent(eventId)}/films/${encodeURIComponent(filmId)}/stream`,
   customerSpreadUrl: (eventId, proofId, index) => `${apiBase}/api/customer-portal/events/${encodeURIComponent(eventId)}/proofs/${encodeURIComponent(proofId)}/spreads/${index}`,

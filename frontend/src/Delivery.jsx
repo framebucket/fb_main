@@ -428,4 +428,86 @@ export function BrandingSettings() {
   );
 }
 
+// ---- Editing style: learn the studio's look from its own finished photos; stamp the logo away from faces
+export function EditingStyleSettings() {
+  const loaded = useLoad(() => api.editingStyle(), []);
+  const [data, setData] = useState(null);
+  const [form, setForm] = useState(null);
+  const [sample, setSample] = useState(null);
+  const [preview, setPreview] = useState({ before: '', after: '' });
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const { busy, run, messages, setError } = useAction();
+  useEffect(() => { if (loaded.data) setData(loaded.data); }, [loaded.data]);
+  useEffect(() => { if (data) setForm({ strength: data.strength, applyStyle: data.apply_style, stampLogo: data.stamp_logo }); }, [data]);
+  useEffect(() => () => { if (preview.before) URL.revokeObjectURL(preview.before); if (preview.after) URL.revokeObjectURL(preview.after); }, [preview]);
+  if (!data || !form) return <p className="customer-empty">{loaded.error || 'Loading…'}</p>;
+  if (!data.planAllows) return <UpgradeNotice feature="CUSTOM_BRANDING" title="Editing style">Teach FrameBucket your editing look from your own finished photos and apply it to every upload, with your logo placed clear of faces.</UpgradeNotice>;
+
+  const learn = async (files) => {
+    if (files.length < 5) { setError('Choose at least 5 finished photos (up to 40) that show your look.'); return; }
+    const r = await run(() => api.uploadStyleReferences(files.slice(0, 40)), `Learned your look from ${Math.min(files.length, 40)} photos.`);
+    if (r) setData(r);
+  };
+  const save = async (e) => { e.preventDefault(); const r = await run(() => api.saveEditingStyle({ strength: Number(form.strength), applyStyle: form.applyStyle, stampLogo: form.stampLogo }), 'Saved. New uploads will use these settings.'); if (r) setData(r); };
+  const tryOn = async (file, strength = form.strength) => {
+    if (!file) return;
+    setSample(file); setPreviewBusy(true); setError('');
+    try {
+      const after = await api.previewEditingStyle(file, Number(strength));
+      setPreview({ before: URL.createObjectURL(file), after: URL.createObjectURL(after) });
+    } catch (requestError) { setError(requestError.message); } finally { setPreviewBusy(false); }
+  };
+  const summary = data.summary;
+
+  return (
+    <div className="growth-stack">
+      {messages}
+      <section className="customer-list-section studio-settings">
+        <fieldset><legend>Your look</legend>
+          {data.has_style ? (
+            <div className="studio-span-2 growth-style-summary">
+              <div className="growth-swatches">{(summary?.swatches || []).map((colour) => <span key={colour} style={{ background: colour }} title={colour} />)}</div>
+              <div><strong>Learned from {data.reference_count} photos</strong><p>{(summary?.words || []).join(' · ')}</p></div>
+            </div>
+          ) : <p className="event-form-note studio-span-2">Upload 15–40 of your own finished photos that show the look you want: a mix of portraits, candids and décor, in different light. FrameBucket learns the tones, colours and contrast and applies the same look to every photo you upload.</p>}
+          <div className="growth-inline-actions studio-span-2">
+            <label className="button button-dark button-small">{data.has_style ? 'Re-learn from new photos' : 'Choose reference photos'}<input hidden multiple type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={(e) => { const files = Array.from(e.target.files || []); e.target.value = ''; learn(files); }} /></label>
+            {data.has_style && <button className="customer-id-link studio-danger-link" type="button" disabled={busy} onClick={async () => { const r = await run(() => api.clearEditingStyle(), 'Look removed. New uploads get basic corrections only.'); if (r) { setData(r); setPreview({ before: '', after: '' }); } }}>Remove look</button>}
+            {busy && <span className="field-hint">Analysing photos…</span>}
+          </div>
+          <p className="event-form-note studio-span-2">Use photos you edited yourself. FrameBucket also learns how your camera's photos look before editing ({data.baseline_samples} uploads so far); the match improves after about 30 uploads.</p>
+        </fieldset>
+      </section>
+
+      <form className="customer-list-section studio-settings" onSubmit={save}>
+        <fieldset><legend>When photos are processed</legend>
+          <label className="studio-check studio-span-2"><input type="checkbox" checked={form.applyStyle} disabled={!data.has_style} onChange={(e) => setForm({ ...form, applyStyle: e.target.checked })} />Apply my look to new uploads</label>
+          <label className="event-form-label studio-span-2">Strength {form.strength}%<input type="range" min="0" max="100" step="5" value={form.strength} disabled={!data.has_style} onChange={(e) => setForm({ ...form, strength: e.target.value })} onMouseUp={() => sample && tryOn(sample)} onTouchEnd={() => sample && tryOn(sample)} /></label>
+          <label className="studio-check studio-span-2"><input type="checkbox" checked={form.stampLogo} onChange={(e) => setForm({ ...form, stampLogo: e.target.checked })} />Add my logo to delivered photos (placed in a corner, never over a face)</label>
+          {!data.has_logo && <p className="event-form-note studio-span-2">Upload your logo under <strong>Branding &amp; watermark</strong> first. A PNG with a transparent background works best.</p>}
+          <p className="event-form-note studio-span-2">Applies to photos uploaded from now on. Originals are always kept untouched; photos already in galleries are not changed.</p>
+          <div className="event-form-actions studio-span-2"><button className="button button-dark" type="submit" disabled={busy}>Save</button></div>
+        </fieldset>
+      </form>
+
+      {data.has_style && (
+        <section className="customer-list-section studio-settings">
+          <fieldset><legend>Try it on a photo</legend>
+            <div className="growth-inline-actions studio-span-2">
+              <label className="button button-quiet button-small">Choose a sample photo<input hidden type="file" accept="image/jpeg,image/png,image/webp,image/tiff" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; tryOn(file); }} /></label>
+              {previewBusy && <span className="field-hint">Rendering preview…</span>}
+            </div>
+            {preview.after && (
+              <div className="growth-before-after studio-span-2">
+                <figure><img src={preview.before} alt="Your photo before" /><figcaption>Before</figcaption></figure>
+                <figure><img src={preview.after} alt="With your look and logo" /><figcaption>With your look{form.stampLogo && data.has_logo ? ' and logo' : ''} · {form.strength}%</figcaption></figure>
+              </div>
+            )}
+          </fieldset>
+        </section>
+      )}
+    </div>
+  );
+}
+
 export { inr };
