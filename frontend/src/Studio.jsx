@@ -18,7 +18,7 @@ function today() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-function shortDate(value) {
+export function shortDate(value) {
   return value ? new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 }
 
@@ -27,7 +27,7 @@ function timeLabel(value) {
   return match ? new Date(2000, 0, 1, Number(match[1]), Number(match[2])).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
 }
 
-function useLoad(loader, deps) {
+export function useLoad(loader, deps) {
   const [state, setState] = useState({ data: null, loading: true, error: '' });
   const [version, setVersion] = useState(0);
   useEffect(() => {
@@ -42,7 +42,7 @@ function useLoad(loader, deps) {
   return { ...state, reload: () => setVersion((value) => value + 1) };
 }
 
-function PanelIntro({ eyebrow, title, accent, children }) {
+export function PanelIntro({ eyebrow, title, accent, children }) {
   return (
     <div className="customer-module-intro">
       <p className="eyebrow">{eyebrow}</p>
@@ -52,7 +52,7 @@ function PanelIntro({ eyebrow, title, accent, children }) {
   );
 }
 
-function Modal({ eyebrow, title, onClose, wide, children }) {
+export function Modal({ eyebrow, title, onClose, wide, children }) {
   return (
     <div className="modal-backdrop detail-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className={`customer-detail-modal studio-modal${wide ? ' studio-modal-wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
@@ -63,7 +63,7 @@ function Modal({ eyebrow, title, onClose, wide, children }) {
   );
 }
 
-function Stat({ label, value, tone }) {
+export function Stat({ label, value, tone }) {
   return <div className={`studio-stat${tone ? ` studio-stat-${tone}` : ''}`}><span>{label}</span><b>{value}</b></div>;
 }
 

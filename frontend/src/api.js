@@ -97,6 +97,21 @@ async function requestMultipart(path, body) {
   return payload;
 }
 
+/** Anonymous POST without CSRF/cookies, for the embeddable enquiry form (works inside third-party iframes). */
+async function publicPost(path, body) {
+  const response = await fetch(apiBase + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'omit',
+    body: JSON.stringify(body),
+  });
+  const text = await response.text();
+  let payload = null;
+  if (text) { try { payload = JSON.parse(text); } catch { payload = { detail: text }; } }
+  if (!response.ok) throw new Error(payload?.detail || payload?.message || 'The request could not be completed.');
+  return payload;
+}
+
 async function putUploadBody(grant, file, onProgress) {
   const sameOrigin = Boolean(grant.same_origin);
   const headers = { ...(grant.upload_headers || {}) };
@@ -330,6 +345,84 @@ export const api = {
   adminApproveRequest: (id, body) => request(`/api/admin/plan-requests/${encodeURIComponent(id)}/approve`, { method: 'POST', body }),
   adminRejectRequest: (id, note) => request(`/api/admin/plan-requests/${encodeURIComponent(id)}/reject`, { method: 'POST', body: { note } }),
   adminAudit: (limit) => request(`/api/admin/audit${query({ limit })}`),
+
+  // ---- Bookings: quote catalogue, lead capture, follow-ups, contracts
+  quoteCatalog: () => request('/api/studio/quote-catalog'),
+  saveQuoteSettings: (body) => request('/api/studio/quote-catalog/settings', { method: 'PUT', body }),
+  addQuoteItem: (body) => request('/api/studio/quote-catalog/items', { method: 'POST', body }),
+  updateQuoteItem: (id, body) => request(`/api/studio/quote-catalog/items/${encodeURIComponent(id)}`, { method: 'PUT', body }),
+  removeQuoteItem: (id) => request(`/api/studio/quote-catalog/items/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  addQuotePackage: (body) => request('/api/studio/quote-catalog/packages', { method: 'POST', body }),
+  updateQuotePackage: (id, body) => request(`/api/studio/quote-catalog/packages/${encodeURIComponent(id)}`, { method: 'PUT', body }),
+  deleteQuotePackage: (id) => request(`/api/studio/quote-catalog/packages/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  leadCapture: () => request('/api/studio/lead-capture'),
+  enquiryTracking: () => request('/api/studio/enquiries/tracking'),
+  remindEnquiry: (id) => request(`/api/studio/enquiries/${encodeURIComponent(id)}/remind`, { method: 'POST' }),
+  contractDraft: (id) => request(`/api/studio/enquiries/${encodeURIComponent(id)}/contract`),
+  sendContract: (id, body) => request(`/api/studio/enquiries/${encodeURIComponent(id)}/contract`, { method: 'POST', body }),
+  cancelContract: (id) => request(`/api/studio/enquiries/${encodeURIComponent(id)}/contract`, { method: 'DELETE' }),
+  confirmAdvance: (id, body) => request(`/api/studio/enquiries/${encodeURIComponent(id)}/contract/advance`, { method: 'POST', body }),
+  contractPdfUrl: (id) => `${apiBase}/api/studio/enquiries/${encodeURIComponent(id)}/contract.pdf`,
+  publicEnquiryForm: (slug) => request(`/api/public/studios/${encodeURIComponent(slug)}/enquiry-form`),
+  submitPublicEnquiry: (slug, body) => publicPost(`/api/public/studios/${encodeURIComponent(slug)}/enquiries`, body),
+  signContract: (token, body) => request(`/api/public/enquiries/quote/${encodeURIComponent(token)}/contract/sign`, { method: 'POST', body }),
+  reportAdvance: (token, reference) => request(`/api/public/enquiries/quote/${encodeURIComponent(token)}/contract/advance`, { method: 'POST', body: { reference } }),
+  advanceQrUrl: (token) => `${apiBase}/api/public/enquiries/quote/${encodeURIComponent(token)}/contract/advance-qr.png`,
+  publicContractPdfUrl: (token) => `${apiBase}/api/public/enquiries/quote/${encodeURIComponent(token)}/contract.pdf`,
+  resolveDomain: () => request('/api/public/domains/resolve'),
+  // ---- Delivery: checklist, films, proofs, branding
+  deliverySteps: (eventId) => request(`/api/events/${encodeURIComponent(eventId)}/delivery/steps`),
+  addDeliveryStep: (eventId, body) => request(`/api/events/${encodeURIComponent(eventId)}/delivery/steps`, { method: 'POST', body }),
+  updateDeliveryStep: (eventId, id, body) => request(`/api/events/${encodeURIComponent(eventId)}/delivery/steps/${encodeURIComponent(id)}`, { method: 'PUT', body }),
+  deleteDeliveryStep: (eventId, id) => request(`/api/events/${encodeURIComponent(eventId)}/delivery/steps/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  films: (eventId) => request(`/api/events/${encodeURIComponent(eventId)}/films`),
+  filmVideos: (eventId) => request(`/api/events/${encodeURIComponent(eventId)}/films/videos`),
+  addFilm: (eventId, body) => request(`/api/events/${encodeURIComponent(eventId)}/films`, { method: 'POST', body }),
+  deleteFilm: (eventId, id) => request(`/api/events/${encodeURIComponent(eventId)}/films/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  proofs: (eventId) => request(`/api/events/${encodeURIComponent(eventId)}/proofs`),
+  sendProof: (eventId, body) => request(`/api/events/${encodeURIComponent(eventId)}/proofs`, { method: 'POST', body }),
+  replyProof: (eventId, proofId, body) => request(`/api/events/${encodeURIComponent(eventId)}/proofs/${encodeURIComponent(proofId)}/comments`, { method: 'POST', body }),
+  resolveProofComment: (eventId, proofId, commentId, resolved) => request(`/api/events/${encodeURIComponent(eventId)}/proofs/${encodeURIComponent(proofId)}/comments/${encodeURIComponent(commentId)}`, { method: 'PUT', body: { resolved } }),
+  brand: () => request('/api/studio/brand'),
+  saveBrand: (body) => request('/api/studio/brand', { method: 'PUT', body }),
+  uploadLogo: (file) => { const form = new FormData(); form.append('file', file); return requestMultipart('/api/studio/brand/logo', form); },
+  deleteLogo: () => request('/api/studio/brand/logo', { method: 'DELETE' }),
+  setDomain: (domain) => request('/api/studio/brand/domain', { method: 'PUT', body: { domain } }),
+  verifyDomain: () => request('/api/studio/brand/domain/verify', { method: 'POST' }),
+  removeDomain: () => request('/api/studio/brand/domain', { method: 'DELETE' }),
+  customerDelivery: (eventId) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/delivery`),
+  customerFilmUrl: (eventId, filmId) => `${apiBase}/api/customer-portal/events/${encodeURIComponent(eventId)}/films/${encodeURIComponent(filmId)}/stream`,
+  customerSpreadUrl: (eventId, proofId, index) => `${apiBase}/api/customer-portal/events/${encodeURIComponent(eventId)}/proofs/${encodeURIComponent(proofId)}/spreads/${index}`,
+  commentProof: (eventId, proofId, body) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/proofs/${encodeURIComponent(proofId)}/comments`, { method: 'POST', body }),
+  approveProof: (eventId, proofId, note) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/proofs/${encodeURIComponent(proofId)}/approve`, { method: 'POST', body: { note } }),
+  requestProofChanges: (eventId, proofId, note) => request(`/api/customer-portal/events/${encodeURIComponent(eventId)}/proofs/${encodeURIComponent(proofId)}/request-changes`, { method: 'POST', body: { note } }),
+  assetUrl: (path) => (path ? `${apiBase}${path}` : null),
+  // ---- Crew, gear, costs, insights
+  crewMembers: () => request('/api/studio/crew/members'),
+  eventCrew: (eventId) => request(`/api/events/${encodeURIComponent(eventId)}/crew`),
+  crewCheck: (eventId, memberType, memberId) => request(`/api/events/${encodeURIComponent(eventId)}/crew/check${query({ memberType, memberId })}`),
+  addCrew: (eventId, body) => request(`/api/events/${encodeURIComponent(eventId)}/crew`, { method: 'POST', body }),
+  updateCrew: (eventId, id, body) => request(`/api/events/${encodeURIComponent(eventId)}/crew/${encodeURIComponent(id)}`, { method: 'PUT', body }),
+  removeCrew: (eventId, id) => request(`/api/events/${encodeURIComponent(eventId)}/crew/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  crewBalances: () => request('/api/studio/crew/balances'),
+  crewPayouts: () => request('/api/studio/crew/payouts'),
+  addCrewPayout: (body) => request('/api/studio/crew/payouts', { method: 'POST', body }),
+  deleteCrewPayout: (id) => request(`/api/studio/crew/payouts/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  crewUnavailable: () => request('/api/studio/crew/unavailable'),
+  addCrewUnavailable: (body) => request('/api/studio/crew/unavailable', { method: 'POST', body }),
+  deleteCrewUnavailable: (id) => request(`/api/studio/crew/unavailable/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  gear: () => request('/api/studio/gear'),
+  addGear: (body) => request('/api/studio/gear', { method: 'POST', body }),
+  updateGear: (id, body) => request(`/api/studio/gear/${encodeURIComponent(id)}`, { method: 'PUT', body }),
+  deleteGear: (id) => request(`/api/studio/gear/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  eventGear: (eventId) => request(`/api/events/${encodeURIComponent(eventId)}/gear`),
+  addEventGear: (eventId, body) => request(`/api/events/${encodeURIComponent(eventId)}/gear`, { method: 'POST', body }),
+  updateEventGear: (eventId, gearId, body) => request(`/api/events/${encodeURIComponent(eventId)}/gear/${encodeURIComponent(gearId)}`, { method: 'PUT', body }),
+  removeEventGear: (eventId, gearId) => request(`/api/events/${encodeURIComponent(eventId)}/gear/${encodeURIComponent(gearId)}`, { method: 'DELETE' }),
+  eventCosts: (eventId) => request(`/api/events/${encodeURIComponent(eventId)}/costs`),
+  addEventCost: (eventId, body) => request(`/api/events/${encodeURIComponent(eventId)}/costs`, { method: 'POST', body }),
+  deleteEventCost: (eventId, id) => request(`/api/events/${encodeURIComponent(eventId)}/costs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  insights: () => request('/api/studio/insights'),
   login: async (form) => {
     const profile = await request('/api/auth/login', { method: 'POST', body: form });
     csrfToken = null;

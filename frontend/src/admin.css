@@ -67,7 +67,7 @@
 
 .admin-drawer-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; justify-content: flex-end; background: var(--fb-overlay, rgba(0, 0, 0, .45)); }
 .admin-drawer { position: relative; width: min(640px, 100%); height: 100%; overflow-y: auto; padding: 28px; box-sizing: border-box; background: var(--fb-raised); border-left: 1px solid var(--fb-line); box-shadow: var(--fb-shadow-2); animation: admin-slide .25s ease; }
-@keyframes admin-slide { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes admin-slide { from { transform: translateX(30px); } to { transform: none; } }
 .admin-drawer h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 4px 0 6px; }
 .admin-drawer h3 { margin: 24px 0 8px; font-size: 1rem; }
 .admin-drawer-close { position: absolute; top: 16px; right: 18px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--fb-line); background: transparent; color: var(--fb-text); font-size: 1.3rem; cursor: pointer; }

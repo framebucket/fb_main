@@ -57,11 +57,16 @@ public class CustomerGalleryController {
         return gallery.saveSelectionForCustomer(eventId, customer, request.photoIds());
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.delivery.WatermarkService watermarks;
+
     @GetMapping("/media/{mediaId}/preview")
     public ResponseEntity<StreamingResponseBody> preview(@PathVariable UUID eventId,
                                                          @PathVariable String mediaId,
                                                          @RequestHeader(value = HttpHeaders.RANGE, required = false) String range,
                                                          @AuthenticationPrincipal CustomerPrincipal customer) {
+        com.framebucket.delivery.WatermarkService.Result marked = watermarks.customerGalleryPreview(eventId, mediaId, range, customer);
+        if (marked != null) return com.framebucket.delivery.CustomerDeliveryController.image(marked);
         String url = gallery.previewUrlForCustomer(eventId, mediaId, customer);
         if (url != null) return PhotographerGalleryController.redirect(url);
         return stream(gallery.previewForCustomer(eventId, mediaId, range, customer));

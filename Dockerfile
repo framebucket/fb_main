@@ -13,6 +13,9 @@ COPY --from=frontend-build /frontend/dist/ backend/src/main/resources/static/
 RUN mvn -f backend/pom.xml -DskipTests package
 
 FROM eclipse-temurin:17-jre
+# Fonts for watermarked previews (Java 2D text rendering).
+RUN apt-get update && apt-get install -y --no-install-recommends fontconfig fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=backend-build /workspace/backend/target/framebucket-backend-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080

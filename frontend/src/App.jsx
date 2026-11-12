@@ -5,10 +5,20 @@ import { ThemeToggle, useTheme } from './theme.jsx';
 import LocalFolderSync from './LocalFolderSync.jsx';
 import { PlanCheckout, PlanUsageCard, PricingPlans, UpgradeNotice, hasFeature } from './Plans.jsx';
 import AdminApp from './Admin.jsx';
+import { EnquireFormPage, EnquiryBookingCell, LeadCaptureSettings, QuoteCatalogSettings, QuoteContractSection, QuotePackagePicker, StudioMark, brandStyle, useEnquiryTracking } from './Bookings.jsx';
+import { BrandingSettings, CustomerDeliveryModal, EventWorkspaceModal } from './Delivery.jsx';
+import { CrewPanel } from './Crew.jsx';
+import { InsightsPanel } from './Insights.jsx';
 import { BillingPanel, CalendarPanel, CustomerBillingModal, FlipbookPage, PublicPortfolioPage, ShowcasePanel, StudioSettingsPanel, useCustomerDownloadPolicy } from './Studio.jsx';
 
 function isAdminPath(path) {
   return path === '/admin' || path.startsWith('/admin/');
+}
+
+/** Hosts that are definitely FrameBucket itself, so the custom-domain lookup is skipped. */
+function mightBeStudioDomain() {
+  const host = window.location.hostname;
+  return !(host === 'localhost' || /^[\d.]+$/.test(host) || host.includes('framebucket') || host.endsWith('.railway.app') || host.endsWith('.amazonaws.com'));
 }
 
 function currentPath() {
@@ -22,6 +32,12 @@ export default function App() {
   const [loadingSession, setLoadingSession] = useState(path === '/dashboard' || isAdminPath(path));
   const [loadingCustomerPortal, setLoadingCustomerPortal] = useState(path === '/customer-portal');
   const [notice, setNotice] = useState('');
+  const [studioDomain, setStudioDomain] = useState(() => ((path === '/' || path === '/enquire') && mightBeStudioDomain() ? undefined : null));
+
+  useEffect(() => {
+    if (studioDomain !== undefined) return;
+    api.resolveDomain().then(setStudioDomain).catch(() => setStudioDomain(null));
+  }, [studioDomain]);
 
   function navigate(destination, replace = false) {
     if (replace) {
@@ -103,6 +119,22 @@ export default function App() {
 
   if (path.startsWith('/flipbook/')) {
     return <FlipbookPage token={path.split('/')[2] || ''} />;
+  }
+
+  if (path.startsWith('/enquire/')) {
+    return <EnquireFormPage slug={path.split('/')[2] || ''} />;
+  }
+
+  if ((path === '/' || path === '/enquire') && studioDomain === undefined) {
+    return <LoadingPage />;
+  }
+
+  if (studioDomain && path === '/enquire') {
+    return <EnquireFormPage slug={studioDomain.slug} />;
+  }
+
+  if (studioDomain && path === '/') {
+    return <PublicPortfolioPage slug={studioDomain.slug} />;
   }
 
   if (path.startsWith('/event-checkin/')) {
@@ -200,6 +232,19 @@ export default function App() {
   return <HomePage navigate={navigate} />;
 }
 
+function GrowthSettings({ user }) {
+  const [tab, setTab] = useState('packages');
+  return (
+    <section className="event-module studio-panel">
+      <div className="customer-module-intro"><p className="eyebrow">Win more bookings · look premium</p><h2>Bookings &amp; <em>brand.</em></h2><p>Your packages and prices, enquiry links for Instagram, WhatsApp and your website, and your logo, colours, watermark and domain.</p></div>
+      <div className="studio-subtabs">{[['packages', 'Packages & pricing'], ['leads', 'Enquiry links'], ['brand', 'Branding & watermark']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>
+      {tab === 'packages' && <QuoteCatalogSettings user={user} />}
+      {tab === 'leads' && (hasFeature(user, 'LEAD_CAPTURE') ? <LeadCaptureSettings /> : <UpgradeNotice feature="LEAD_CAPTURE" title="Enquiry links">Get enquiries straight from Instagram, WhatsApp and your website.</UpgradeNotice>)}
+      {tab === 'brand' && <BrandingSettings />}
+    </section>
+  );
+}
+
 function Brand() {
   return (
     <a className="brand" href="/" aria-label="FrameBucket home">
@@ -238,7 +283,7 @@ function HomePage({ navigate }) {
               <button type="button" className="lp-button lp-button-primary" onClick={() => navigate('/register')}>Start your 14-day free trial</button>
               <button type="button" className="lp-button lp-button-ghost" onClick={() => navigate('/login')}>Log in</button>
             </div>
-            <p className="lp-hero-fine">Free for 7 days. Made for independent photographers and small studios.</p>
+            <p className="lp-hero-fine">Free for 14 days, then a free plan forever. Made for independent photographers and small studios.</p>
           </div>
           <div className="lp-hero-visual">
             <HeroScene theme={theme} />
@@ -977,6 +1022,9 @@ function Dashboard({ user, onLogout }) {
         <button className={activeTab === 'team' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('team')} aria-pressed={activeTab === 'team'}>
           Team
         </button>
+        <button className={activeTab === 'crew' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('crew')} aria-pressed={activeTab === 'crew'}>
+          Crew &amp; gear
+        </button>
         <button className={activeTab === 'calendar' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('calendar')} aria-pressed={activeTab === 'calendar'}>
           Calendar
         </button>
@@ -985,6 +1033,9 @@ function Dashboard({ user, onLogout }) {
         </button>
         <button className={activeTab === 'showcase' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('showcase')} aria-pressed={activeTab === 'showcase'}>
           Portfolio
+        </button>
+        <button className={activeTab === 'insights' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('insights')} aria-pressed={activeTab === 'insights'}>
+          Insights {!hasFeature(user, 'INSIGHTS') && <span className="tab-lock">Upgrade</span>}
         </button>
         <button
           className={activeTab === 'data' ? 'module-tab active' : 'module-tab'}
@@ -998,9 +1049,9 @@ function Dashboard({ user, onLogout }) {
           Settings
         </button>
       </nav>
-      <p className="workflow-sequence">Photography workflow <b>Enquiries</b><span>→</span><b>Customers</b><span>→</span><b>Events</b><span>→</span><b>Team</b><span>→</span><b>Data</b></p>
+      <p className="workflow-sequence">Photography workflow <b>Enquiries</b><span>→</span><b>Contract</b><span>→</span><b>Events</b><span>→</span><b>Crew</b><span>→</span><b>Delivery</b></p>
       <div className="module-stage" key={activeTab}>
-        {activeTab === 'overview' ? <DashboardOverview user={user} /> : activeTab === 'enquiries' ? <EnquiryPanel user={user} /> : activeTab === 'customers' ? <CustomerPanel user={user} /> : activeTab === 'events' ? <EventPanel user={user} onOpenGallery={(event) => { setDataEventId(event.id); setActiveTab('data'); }} /> : activeTab === 'team' ? <TeamPanel user={user} /> : activeTab === 'calendar' ? <CalendarPanel user={user} /> : activeTab === 'billing' ? (hasFeature(user, 'BILLING') ? <BillingPanel user={user} /> : <UpgradeNotice feature="BILLING" title="Payments, receipts & expenses">Record client payments, share UPI payment QR codes, send GST receipts and track studio expenses.</UpgradeNotice>) : activeTab === 'showcase' ? (hasFeature(user, 'PORTFOLIO') || hasFeature(user, 'E_ALBUM') ? <ShowcasePanel user={user} /> : <UpgradeNotice feature="PORTFOLIO" title="Portfolio & e-album flipbooks">Publish a public portfolio page and share page-turning e-albums with your clients.</UpgradeNotice>) : activeTab === 'settings' ? <StudioSettingsPanel /> : dataModuleEnabled ? <DataPanel initialEventId={dataEventId} /> : <UpgradeNotice feature="GALLERY" title="Online galleries">Deliver photos online with client selection and downloads.</UpgradeNotice>}
+        {activeTab === 'overview' ? <DashboardOverview user={user} /> : activeTab === 'enquiries' ? <EnquiryPanel user={user} /> : activeTab === 'customers' ? <CustomerPanel user={user} /> : activeTab === 'events' ? <EventPanel user={user} onOpenGallery={(event) => { setDataEventId(event.id); setActiveTab('data'); }} /> : activeTab === 'team' ? <TeamPanel user={user} /> : activeTab === 'crew' ? <CrewPanel user={user} /> : activeTab === 'insights' ? <InsightsPanel user={user} /> : activeTab === 'calendar' ? <CalendarPanel user={user} /> : activeTab === 'billing' ? (hasFeature(user, 'BILLING') ? <BillingPanel user={user} /> : <UpgradeNotice feature="BILLING" title="Payments, receipts & expenses">Record client payments, share UPI payment QR codes, send GST receipts and track studio expenses.</UpgradeNotice>) : activeTab === 'showcase' ? (hasFeature(user, 'PORTFOLIO') || hasFeature(user, 'E_ALBUM') ? <ShowcasePanel user={user} /> : <UpgradeNotice feature="PORTFOLIO" title="Portfolio & e-album flipbooks">Publish a public portfolio page and share page-turning e-albums with your clients.</UpgradeNotice>) : activeTab === 'settings' ? <><StudioSettingsPanel /><GrowthSettings user={user} /></> : dataModuleEnabled ? <DataPanel initialEventId={dataEventId} /> : <UpgradeNotice feature="GALLERY" title="Online galleries">Deliver photos online with client selection and downloads.</UpgradeNotice>}
       </div>
       <footer className="dashboard-footer"><Brand /><span>Your growth counts.</span><span>© 2026 FrameBucket</span></footer>
     </main>
@@ -1165,6 +1216,7 @@ function EnquiryPanel({ user }) {
   const [notice, setNotice] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [createEventInfo, setCreateEventInfo] = useState(null);
+  const tracking = useEnquiryTracking(enquiries.length);
 
   useEffect(() => {
     let cancelled = false;
@@ -1285,7 +1337,7 @@ function EnquiryPanel({ user }) {
         ) : (
           <div className="customer-table-scroll">
             <table className="customer-table enquiry-table">
-              <thead><tr><th scope="col">Enquiry ID</th><th scope="col">Enquiry Event</th><th scope="col">Enquiry Name</th><th scope="col">Enquiry Number</th><th scope="col">Enquiry Email ID</th><th scope="col">Enquiry Quotation</th><th scope="col">Finalized Quotation</th><th scope="col">Workflow</th></tr></thead>
+              <thead><tr><th scope="col">Enquiry ID</th><th scope="col">Enquiry Event</th><th scope="col">Enquiry Name</th><th scope="col">Enquiry Number</th><th scope="col">Enquiry Email ID</th><th scope="col">Enquiry Quotation</th><th scope="col">Finalized Quotation</th><th scope="col">Follow-up &amp; contract</th><th scope="col">Workflow</th></tr></thead>
               <tbody>{enquiries.map((enquiry) => (
                 <tr key={enquiry.id}>
                   <th scope="row"><span className="event-code">{enquiry.enquiryId}</span></th>
@@ -1299,6 +1351,7 @@ function EnquiryPanel({ user }) {
                   <td className="finalized-quote-cell">{enquiry.createdEventId
                     ? <a className="customer-id-link finalized-quote-link" href={api.enquiryFinalizedQuotationUrl(enquiry.id)} target="_blank" rel="noreferrer">{formatInr(Number(enquiry.finalizedQuote))} ↗</a>
                     : <div className="finalized-quote-editor"><span>INR</span><input aria-label={`Finalized quote for ${enquiry.name}`} type="number" min="0" step="0.01" value={finalizedQuoteDrafts[enquiry.id] ?? ''} onChange={(event) => setFinalizedQuoteDrafts((current) => ({ ...current, [enquiry.id]: event.target.value }))} disabled={!enquiry.quotationId || savingQuoteId === enquiry.id} /><button className="button button-quiet finalized-quote-save" type="button" onClick={() => saveFinalizedQuote(enquiry)} disabled={!enquiry.quotationId || savingQuoteId === enquiry.id || finalizedQuoteDrafts[enquiry.id] === ''}>{savingQuoteId === enquiry.id ? 'Saving…' : 'Save'}</button></div>}</td>
+                  <td><EnquiryBookingCell enquiry={enquiry} tracking={tracking.map[enquiry.id]} user={user} onChanged={tracking.reload} /></td>
                   <td>{enquiry.createdEventCode
                     ? <span className="enquiry-converted">Event {enquiry.createdEventCode}</span>
                     : enquiry.quotationId
@@ -1883,6 +1936,7 @@ function EventPanel({ user, onOpenGallery }) {
   const [showRegistration, setShowRegistration] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [updatingAssigneeId, setUpdatingAssigneeId] = useState('');
+  const [workspaceEvent, setWorkspaceEvent] = useState(null);
   const [downloadingQrId, setDownloadingQrId] = useState('');
   const [assigneeSelections, setAssigneeSelections] = useState({});
 
@@ -2049,7 +2103,7 @@ function EventPanel({ user, onOpenGallery }) {
                       {event.locationNotes && <small>{event.locationNotes}</small>}
                     </div> : <span className="event-location-missing">Not provided</span>}</td>
                     <td className="album-link-cell">
-                      <button className="button button-dark button-small event-gallery-button" type="button" disabled={!user.dataModuleEnabled} title={user.dataModuleEnabled ? 'Open this event gallery' : 'Online galleries are not included in your current plan.'} onClick={() => onOpenGallery(event)}>Gallery</button>
+                      <button className="button button-quiet button-small" type="button" onClick={() => setWorkspaceEvent(event)}>Manage</button>{workspaceEvent?.id === event.id && <EventWorkspaceModal event={event} user={user} onClose={() => setWorkspaceEvent(null)} />}<button className="button button-dark button-small event-gallery-button" type="button" disabled={!user.dataModuleEnabled} title={user.dataModuleEnabled ? 'Open this event gallery' : 'Online galleries are not included in your current plan.'} onClick={() => onOpenGallery(event)}>Gallery</button>
                       {event.eventGallery && <a className="album-design-link" href={event.eventGallery} target="_blank" rel="noreferrer">Designer folder ↗</a>}
                     </td>
                     <td>{new Date(event.createdAt).toLocaleString()}</td>
@@ -2274,7 +2328,7 @@ function QuotationBuilderPage({ token }) {
   const [context, setContext] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ venue: '', eventDate: '', preferredTime: 'Morning', events: [], albumSheets: 0 });
+  const [form, setForm] = useState({ venue: '', eventDate: '', preferredTime: 'Morning', events: [], albumSheets: 0, packageId: null, addonIds: [] });
   const [finalPrice, setFinalPrice] = useState(null);
   const [pricingBusy, setPricingBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -2315,6 +2369,8 @@ function QuotationBuilderPage({ token }) {
         preferredTime: form.preferredTime,
         events: form.events,
         albumSheets: Number(form.albumSheets) || 0,
+        packageId: form.packageId || null,
+        addonIds: form.addonIds || [],
       })
         .then((price) => { if (!cancelled) { setFinalPrice(price.finalPrice); setError(''); } })
         .catch((requestError) => { if (!cancelled) setError(requestError.message); })
@@ -2354,6 +2410,8 @@ function QuotationBuilderPage({ token }) {
         preferredTime: form.preferredTime,
         events: form.events,
         albumSheets: Number(form.albumSheets) || 0,
+        packageId: form.packageId || null,
+        addonIds: form.addonIds || [],
       });
       setFinalPrice(result.finalPrice);
       setPdfUrl(api.publicQuotePdfUrl(token));
@@ -2367,22 +2425,24 @@ function QuotationBuilderPage({ token }) {
 
   if (loading) return <LoadingPage />;
   if (error && !context) {
-    return <main className="quote-builder-shell"><header className="quote-builder-header"><Brand /><ThemeToggle /></header><div className="quote-error-card"><p className="eyebrow">Quotation link</p><h1>This link is unavailable.</h1><p>{error}</p></div></main>;
+    return <main className="quote-builder-shell" style={brandStyle(context?.brand)}><header className="quote-builder-header"><Brand /><ThemeToggle /></header><div className="quote-error-card"><p className="eyebrow">Quotation link</p><h1>This link is unavailable.</h1><p>{error}</p></div></main>;
   }
   if (!context) return <LoadingPage />;
 
   if (submitted) {
     return (
-      <main className="quote-builder-shell">
-        <header className="quote-builder-header"><Brand /><div className="quote-header-actions"><span>{context.studioName}</span><ThemeToggle /></div></header>
+      <main className="quote-builder-shell" style={brandStyle(context?.brand)}>
+        <header className="quote-builder-header"><Brand /><div className="quote-header-actions"><StudioMark brand={context.brand} /><span>{context.studioName}</span><ThemeToggle /></div></header>
         <section className="quote-submitted-card">
           <div className="quote-submitted-mark">✓</div>
           <p className="eyebrow">Quotation submitted</p>
           <h1>Your estimate is ready.</h1>
           <p>The photographer has been notified. You can open your quotation PDF below.</p>
           {finalPrice !== null && <strong className="quote-final-amount">{formatInr(Number(finalPrice))}</strong>}
+          {context.submittedPackageName && <p>Package: <b>{context.submittedPackageName}</b>{context.submittedAddonNames?.length ? ` + ${context.submittedAddonNames.join(', ')}` : ''}</p>}
           <a className="button button-dark" href={pdfUrl || api.publicQuotePdfUrl(token)} target="_blank" rel="noreferrer">Open quotation PDF</a>
         </section>
+        <div className="quote-builder-wrap"><QuoteContractSection token={token} contract={context.contract} /></div>
         <footer className="quote-builder-footer">© 2026 FrameBucket · {context.studioName}</footer>
       </main>
     );
@@ -2391,8 +2451,8 @@ function QuotationBuilderPage({ token }) {
   const today = dateString(new Date());
 
   return (
-    <main className="quote-builder-shell">
-      <header className="quote-builder-header"><Brand /><div className="quote-header-actions"><span>{context.studioName} · Photography &amp; Films</span><ThemeToggle /></div></header>
+    <main className="quote-builder-shell" style={brandStyle(context?.brand)}>
+      <header className="quote-builder-header"><Brand /><div className="quote-header-actions"><StudioMark brand={context.brand} /><span>{context.studioName} · Photography &amp; Films</span><ThemeToggle /></div></header>
       <section className="quote-hero">
         <p className="eyebrow">Your celebration, beautifully told</p>
         <h1>Every moment deserves<br /><em>to be remembered.</em></h1>
@@ -2429,6 +2489,7 @@ function QuotationBuilderPage({ token }) {
                   ))}
                 </div>
               </section>
+              <QuotePackagePicker context={context} form={form} setForm={setForm} />
               <section className="quote-card">
                 <div className="quote-card-heading"><div><h2>Make it an album</h2><p>Add a printed album to preserve your favourite memories.</p></div><span>Optional</span></div>
                 <div className="quote-album-row"><div><b>Premium photo album</b><p>Each sheet includes an average of 4–6 photos.</p></div><label>Number of sheets<input type="number" min="0" max="500" step="1" value={form.albumSheets} onChange={(event) => setForm((current) => ({ ...current, albumSheets: event.target.value }))} /></label></div>
@@ -2463,6 +2524,7 @@ function CustomerPortalPage({ customer, onLogout }) {
   const [locationBusy, setLocationBusy] = useState(false);
   const [galleryEvent, setGalleryEvent] = useState(null);
   const [billingEvent, setBillingEvent] = useState(null);
+  const [deliveryEvent, setDeliveryEvent] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -2543,7 +2605,7 @@ function CustomerPortalPage({ customer, onLogout }) {
         ) : (
           <div className="customer-table-scroll">
             <table className="customer-table customer-event-table">
-              <thead><tr><th scope="col">Event</th><th scope="col">Photographer</th><th scope="col">Event date</th><th scope="col">Time</th><th scope="col">Status</th><th scope="col">Assignee</th><th scope="col">Location</th><th scope="col">Photo Gallery</th><th scope="col">Payments & albums</th></tr></thead>
+              <thead><tr><th scope="col">Event</th><th scope="col">Photographer</th><th scope="col">Event date</th><th scope="col">Time</th><th scope="col">Status</th><th scope="col">Assignee</th><th scope="col">Location</th><th scope="col">Photo Gallery</th><th scope="col">Delivery</th><th scope="col">Payments & albums</th></tr></thead>
               <tbody>
                 {events.map((event, index) => (
                   <tr key={event.eventId || `${event.eventName}-${event.eventDate}-${index}`}>
@@ -2561,6 +2623,7 @@ function CustomerPortalPage({ customer, onLogout }) {
                       <button className="customer-id-link" type="button" onClick={() => setLocationEvent(event)}>{event.locationName ? 'Update location' : 'Add location details'}</button>
                     </div></td>
                     <td><button className="button button-dark button-small event-gallery-button" type="button" onClick={() => setGalleryEvent(event)}>{event.albumSubmitted ? 'Open gallery · sent' : 'Open gallery'}</button></td>
+                    <td><button className="button button-quiet button-small" type="button" onClick={() => setDeliveryEvent(event)}>Track</button></td>
                     <td><button className="button button-quiet button-small" type="button" onClick={() => setBillingEvent(event)}>View</button></td>
                   </tr>
                 ))}
@@ -2571,6 +2634,7 @@ function CustomerPortalPage({ customer, onLogout }) {
       </section>
       {locationEvent && <CustomerLocationModal event={locationEvent} busy={locationBusy} error={error} onClose={() => { if (!locationBusy) { setLocationEvent(null); setError(''); } }} onSave={saveLocation} />}
       {billingEvent && <CustomerBillingModal event={billingEvent} onClose={() => setBillingEvent(null)} />}
+      {deliveryEvent && <CustomerDeliveryModal event={deliveryEvent} onClose={() => setDeliveryEvent(null)} />}
       {galleryEvent && <CustomerGalleryModal event={galleryEvent} onClose={() => setGalleryEvent(null)} onSubmitted={() => {
         setGalleryEvent(null);
         setEvents((current) => current.map((event) => event.eventId === galleryEvent.eventId ? { ...event, albumSubmitted: true } : event));

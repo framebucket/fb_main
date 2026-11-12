@@ -108,11 +108,19 @@ public class EventService {
         return new EventIdPreview(subIdService.getPlainSubId(owner) + "_" + String.format(Locale.ROOT, "%05d", owner.getEventSequence()));
     }
 
+    // Dates held by signed booking agreements (com.framebucket.bookings.DateHolds).
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.bookings.DateHolds dateHolds;
+
     @Transactional(readOnly = true)
     public List<LocalDate> blockedDatesForPhotographer(PhotographerPrincipal photographer) {
-        return eventRepository.findAllByPhotographer_IdOrderByEventDateAsc(photographer.getId())
-                .stream()
-                .map(EventBooking::getEventDate)
+        return java.util.stream.Stream.concat(
+                        eventRepository.findAllByPhotographer_IdOrderByEventDateAsc(photographer.getId())
+                                .stream()
+                                .map(EventBooking::getEventDate),
+                        dateHolds.heldDates(photographer.getId()).stream())
+                .distinct()
+                .sorted()
                 .toList();
     }
 
@@ -148,6 +156,10 @@ public class EventService {
 
         if (eventRepository.existsByPhotographer_IdAndEventDate(owner.getId(), request.eventDate())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "That date is already booked for another event.");
+        }
+        if (dateHolds.holder(owner.getId(), request.eventDate()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "That date is on hold for a signed booking agreement. Create the event from that enquiry, or cancel its contract first.");
         }
 
         Customer customer = customerRepository.findByIdAndPhotographer_Id(request.customerId(), owner.getId())

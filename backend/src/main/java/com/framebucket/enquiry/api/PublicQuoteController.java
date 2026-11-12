@@ -27,9 +27,14 @@ public class PublicQuoteController {
         this.enquiryService = enquiryService;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.bookings.BookingHooks bookingHooks;
+
     @GetMapping
     public PublicQuoteContext context(@PathVariable String token) {
-        return enquiryService.publicQuoteContext(token);
+        PublicQuoteContext context = enquiryService.publicQuoteContext(token);
+        bookingHooks.markOpened(token);
+        return context;
     }
 
     @PostMapping("/calculate")

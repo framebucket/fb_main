@@ -100,6 +100,10 @@ public final class EnquiryDtos {
     public record QuoteServiceOption(String id, String name, String description) {
     }
 
+    public record QuotePackageOption(UUID id, String name, String description, List<String> inclusions,
+                                     BigDecimal price, boolean highlighted) {
+    }
+
     public record PublicQuoteContext(
             String customerName,
             String customerMobile,
@@ -110,7 +114,13 @@ public final class EnquiryDtos {
             List<QuoteServiceOption> services,
             boolean alreadySubmitted,
             String submittedPdfUrl,
-            BigDecimal submittedFinalPrice
+            BigDecimal submittedFinalPrice,
+            List<QuoteServiceOption> addons,
+            List<QuotePackageOption> packages,
+            String submittedPackageName,
+            List<String> submittedAddonNames,
+            Object contract,
+            Object brand
     ) {
     }
 
@@ -125,7 +135,9 @@ public final class EnquiryDtos {
             LocalDate eventDate,
             @Size(max = 40) String preferredTime,
             @NotEmpty @Size(max = 8) List<@Valid QuoteEventRequest> events,
-            @Min(0) @Max(500) int albumSheets
+            @Min(0) @Max(500) int albumSheets,
+            UUID packageId,
+            @Size(max = 20) List<@NotBlank @Size(max = 80) String> addonIds
     ) {
     }
 

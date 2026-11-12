@@ -60,6 +60,22 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
+                        // Public enquiry form: anonymous, often embedded on another site where cookies are blocked.
+                        .ignoringRequestMatchers(new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
+                                "/api/public/studios/*/enquiries", "POST"))
+                )
+                .headers(headers -> headers
+                        .frameOptions(frame -> frame.disable())
+                        // Everything stays DENY except the enquiry form, which studios embed on their websites.
+                        .addHeaderWriter(new org.springframework.security.web.header.writers.DelegatingRequestMatcherHeaderWriter(
+                                // Match on the original URL: /enquire/{slug} is forwarded to /index.html.
+                                (org.springframework.security.web.util.matcher.RequestMatcher) request -> {
+                                    Object forwarded = request.getAttribute(jakarta.servlet.RequestDispatcher.FORWARD_REQUEST_URI);
+                                    String uri = forwarded instanceof String value ? value : request.getRequestURI();
+                                    return !(uri.equals(request.getContextPath() + "/enquire") || uri.startsWith(request.getContextPath() + "/enquire/"));
+                                },
+                                new org.springframework.security.web.header.writers.frameoptions.XFrameOptionsHeaderWriter(
+                                        org.springframework.security.web.header.writers.frameoptions.XFrameOptionsHeaderWriter.XFrameOptionsMode.DENY)))
                 )
                 .securityContext(securityContext -> securityContext
                         .securityContextRepository(securityContextRepository)
@@ -88,7 +104,9 @@ public class SecurityConfig {
                                 "/portfolio/**",
                                 "/flipbook/**",
                                 "/admin",
-                                "/admin/**"
+                                "/admin/**",
+                                "/enquire",
+                                "/enquire/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/subscriptions").permitAll()

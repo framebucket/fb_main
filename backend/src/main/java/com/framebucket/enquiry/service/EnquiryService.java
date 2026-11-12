@@ -64,6 +64,10 @@ public class EnquiryService {
     @org.springframework.beans.factory.annotation.Autowired
     private com.framebucket.subscription.EntitlementService entitlements;
 
+    // Lead source, quote links, contracts and date holds (see com.framebucket.bookings).
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.bookings.BookingHooks bookingHooks;
+
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final DateTimeFormatter ENQUIRY_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSSSSSSSS", Locale.ROOT);
 
@@ -117,7 +121,19 @@ public class EnquiryService {
 
     @Transactional
     public EnquiryResponse create(PhotographerPrincipal principal, CreateEnquiryRequest request) {
-        PhotographerUser photographer = photographerRepository.findByIdForUpdate(principal.getId())
+        return createFor(principal.getId(), request, "MANUAL", null, null);
+    }
+
+    /** An enquiry submitted through the studio's public enquiry form. */
+    @Transactional
+    public UUID createLead(UUID photographerId, CreateEnquiryRequest request, String source, String message,
+                           java.time.LocalDate preferredDate) {
+        return createFor(photographerId, request, source, message, preferredDate).id();
+    }
+
+    private EnquiryResponse createFor(UUID photographerId, CreateEnquiryRequest request, String source, String message,
+                                      java.time.LocalDate preferredDate) {
+        PhotographerUser photographer = photographerRepository.findByIdForUpdate(photographerId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Photographer account not found."));
         EventType eventType = findEventType(request.eventTypeId(), photographer.getId());
         String mobileNumber;
@@ -136,7 +152,7 @@ public class EnquiryService {
         }
 
         String token = createQuoteAccessToken();
-        Enquiry enquiry = enquiryRepository.save(new Enquiry(
+        Enquiry enquiry = enquiryRepository.saveAndFlush(new Enquiry(
                 enquiryId,
                 photographer,
                 eventType,
@@ -145,6 +161,7 @@ public class EnquiryService {
                 request.email(),
                 hashToken(token)
         ));
+        bookingHooks.afterEnquiryCreated(enquiry.getId(), token, source, message, preferredDate);
         String quoteLink = frontendBaseUrl + "/quote/" + token;
         eventPublisher.publishEvent(new EnquiryCreatedNotice(
                 enquiry.getName(),
@@ -226,11 +243,11 @@ public class EnquiryService {
         return new EnquiryEventSetupResponse(
                 enquiry.getEventType().getId(),
                 enquiry.getEventType().getName(),
-                quotation.getPreferredEventDate(),
+                bookingHooks.contractDateOr(enquiry.getId(), quotation.getPreferredEventDate()),
                 customer != null,
                 customer == null ? null : customer.getId(),
                 customer == null ? null : customer.getCustomerCode(),
-                eventService.blockedDatesForPhotographer(principal)
+                bookingHooks.excludeOwnHold(enquiry.getId(), eventService.blockedDatesForPhotographer(principal))
         );
     }
 
@@ -290,6 +307,7 @@ public class EnquiryService {
 
         BigDecimal finalAmount = enquiry.getFinalizedQuote().setScale(2, RoundingMode.HALF_UP);
         byte[] finalizedPdf = regenerateQuotationPdf(enquiry, quotation, finalAmount);
+        bookingHooks.beforeEventFromEnquiry(enquiry.getId());
         EventResponse event = eventService.createEvent(principal, new EventCreateRequest(
                 request.eventDate(),
                 enquiry.getEventType().getId(),
@@ -299,6 +317,7 @@ public class EnquiryService {
         enquiry.convertToCustomer(customer);
         enquiry.setCreatedEvent(event.id(), event.eventCode());
         quotation.replaceFinalPriceAndPdf(finalAmount, finalizedPdf);
+        bookingHooks.afterEventFromEnquiry(photographer.getId(), enquiry.getId(), event.id());
         return new CreateEventFromEnquiryResponse(
                 event.id(),
                 event.eventCode(),
@@ -331,7 +350,7 @@ public class EnquiryService {
                         quotation.getPreferredEventDate(),
                         quotation.getPreferredTime(),
                         selections,
-                        quotation.getAlbumSheets()
+                        quotation.getAlbumSheets(), null, null
                 ),
                 enquiry.getPhotographer().getId()
         );
@@ -341,10 +360,13 @@ public class EnquiryService {
                         quotation.getPreferredEventDate(),
                         quotation.getPreferredTime(),
                         selections,
-                        quotation.getAlbumSheets()
+                        quotation.getAlbumSheets(), null, null
                 ),
-                selectedEventTypes
+                selectedEventTypes,
+                enquiry.getPhotographer().getId()
         );
+        com.framebucket.bookings.BookingHooks.QuotationExtras extras = bookingHooks.quotationExtras(enquiry.getId());
+        summaries = withExtras(summaries, enquiry.getPhotographer().getId(), extras.packageName(), extras.addonCodes());
         return pdfGenerator.generate(
                 displayName(enquiry.getPhotographer()),
                 quotation.getQuoteNumber(),
@@ -374,10 +396,17 @@ public class EnquiryService {
                 enquiry.getEventType().getName(),
                 displayName(photographer),
                 eventTypesFor(photographer.getId()),
-                pricingService.serviceOptions(),
+                pricingService.serviceOptions(photographer.getId()),
                 quotation != null,
                 pdfUrl,
-                quotation == null ? null : quotation.getFinalPrice()
+                quotation == null ? null : quotation.getFinalPrice(),
+                pricingService.addonOptions(photographer.getId()),
+                pricingService.packageOptions(photographer.getId()),
+                quotation == null ? null : bookingHooks.quotationExtras(enquiry.getId()).packageName(),
+                quotation == null ? List.of() : pricingService.addonNames(photographer.getId(),
+                        bookingHooks.quotationExtras(enquiry.getId()).addonCodes()),
+                bookingHooks.publicContract(enquiry.getId()),
+                bookingHooks.brand(photographer.getId())
         );
     }
 
@@ -388,7 +417,7 @@ public class EnquiryService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This quotation has already been submitted.");
         }
         validateEventSelections(request, enquiry.getPhotographer().getId());
-        return pricingService.calculate(request);
+        return pricingService.calculate(enquiry.getPhotographer().getId(), request);
     }
 
     @Transactional
@@ -398,8 +427,13 @@ public class EnquiryService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This quotation has already been submitted.");
         }
         List<EventType> eventTypes = validateEventSelections(request, enquiry.getPhotographer().getId());
-        BigDecimal finalPrice = pricingService.calculate(request).finalPrice();
-        List<QuotationPdfGenerator.EventSummary> summaries = buildEventSummaries(request, eventTypes);
+        UUID photographerId = enquiry.getPhotographer().getId();
+        BigDecimal finalPrice = pricingService.calculate(photographerId, request).finalPrice();
+        String packageName = request.packageId() == null ? null
+                : pricingService.packageById(photographerId, request.packageId(), true).name();
+        List<String> addonCodes = QuotePricingService.addonCodes(request);
+        List<QuotationPdfGenerator.EventSummary> summaries = withExtras(
+                buildEventSummaries(request, eventTypes, photographerId), photographerId, packageName, addonCodes);
         String quoteNumber = "Q-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT);
         byte[] pdf = pdfGenerator.generate(
                 displayName(enquiry.getPhotographer()),
@@ -422,7 +456,7 @@ public class EnquiryService {
             throw new IllegalStateException("Could not save the quotation selections.", exception);
         }
 
-        quotationRepository.save(new Quotation(
+        quotationRepository.saveAndFlush(new Quotation(
                 enquiry,
                 quoteNumber,
                 enquiry.getName(),
@@ -438,6 +472,7 @@ public class EnquiryService {
                 finalPrice,
                 pdf
         ));
+        bookingHooks.afterQuotationSaved(enquiry.getId(), request.packageId(), packageName, addonCodes);
         String pdfUrl = publicPdfUrl(rawToken);
         eventPublisher.publishEvent(new QuotationSubmittedNotice(
                 enquiry.getPhotographer().getFullName(),
@@ -483,9 +518,21 @@ public class EnquiryService {
                 .toList();
     }
 
+    private List<QuotationPdfGenerator.EventSummary> withExtras(List<QuotationPdfGenerator.EventSummary> summaries,
+                                                                UUID photographerId, String packageName, List<String> addonCodes) {
+        List<QuotationPdfGenerator.EventSummary> all = new java.util.ArrayList<>(summaries);
+        if (packageName != null) {
+            all.add(0, new QuotationPdfGenerator.EventSummary("Package: " + packageName, List.of("As described in your selected package")));
+        }
+        List<String> addonNames = pricingService.addonNames(photographerId, addonCodes);
+        if (!addonNames.isEmpty()) all.add(new QuotationPdfGenerator.EventSummary("Add-ons", addonNames));
+        return all;
+    }
+
     private List<QuotationPdfGenerator.EventSummary> buildEventSummaries(
             QuoteSubmissionRequest request,
-            List<EventType> eventTypes
+            List<EventType> eventTypes,
+            UUID photographerId
     ) {
         List<QuoteEventRequest> requestedEvents = request.events();
         List<QuotationPdfGenerator.EventSummary> summaries = new java.util.ArrayList<>();
@@ -493,7 +540,7 @@ public class EnquiryService {
             QuoteEventRequest event = requestedEvents.get(index);
             summaries.add(new QuotationPdfGenerator.EventSummary(
                     eventTypes.get(index).getName(),
-                    pricingService.serviceNames(event)
+                    pricingService.serviceNames(photographerId, event)
             ));
         }
         return summaries;
