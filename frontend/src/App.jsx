@@ -3,6 +3,7 @@ import { api } from './api.js';
 import HeroScene from './HeroScene.jsx';
 import { ThemeToggle, useTheme } from './theme.jsx';
 import LocalFolderSync from './LocalFolderSync.jsx';
+import { BillingPanel, CalendarPanel, CustomerBillingModal, FlipbookPage, PublicPortfolioPage, ShowcasePanel, StudioSettingsPanel, useCustomerDownloadPolicy } from './Studio.jsx';
 
 function currentPath() {
   return window.location.pathname.replace(/\/+$/, '') || '/';
@@ -88,6 +89,14 @@ export default function App() {
   if (path.startsWith('/team-invite/')) {
     const token = path.split('/')[2] || '';
     return <TeamInvitePage token={token} />;
+  }
+
+  if (path.startsWith('/portfolio/')) {
+    return <PublicPortfolioPage slug={path.split('/')[2] || ''} />;
+  }
+
+  if (path.startsWith('/flipbook/')) {
+    return <FlipbookPage token={path.split('/')[2] || ''} />;
   }
 
   if (path.startsWith('/event-checkin/')) {
@@ -1124,6 +1133,15 @@ function Dashboard({ user, onLogout }) {
         <button className={activeTab === 'team' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('team')} aria-pressed={activeTab === 'team'}>
           Team
         </button>
+        <button className={activeTab === 'calendar' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('calendar')} aria-pressed={activeTab === 'calendar'}>
+          Calendar
+        </button>
+        <button className={activeTab === 'billing' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('billing')} aria-pressed={activeTab === 'billing'}>
+          Billing
+        </button>
+        <button className={activeTab === 'showcase' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('showcase')} aria-pressed={activeTab === 'showcase'}>
+          Portfolio
+        </button>
         <button
           className={activeTab === 'data' ? 'module-tab active' : 'module-tab'}
           onClick={() => setActiveTab('data')}
@@ -1133,10 +1151,13 @@ function Dashboard({ user, onLogout }) {
         >
           Data {!dataModuleEnabled && <span className="tab-lock">Bronze</span>}
         </button>
+        <button className={activeTab === 'settings' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('settings')} aria-pressed={activeTab === 'settings'}>
+          Settings
+        </button>
       </nav>
       <p className="workflow-sequence">Photography workflow <b>Enquiries</b><span>→</span><b>Customers</b><span>→</span><b>Events</b><span>→</span><b>Team</b><span>→</span><b>Data</b></p>
       <div className="module-stage" key={activeTab}>
-        {activeTab === 'overview' ? <DashboardOverview user={user} /> : activeTab === 'enquiries' ? <EnquiryPanel user={user} /> : activeTab === 'customers' ? <CustomerPanel user={user} /> : activeTab === 'events' ? <EventPanel user={user} onOpenGallery={(event) => { setDataEventId(event.id); setActiveTab('data'); }} /> : activeTab === 'team' ? <TeamPanel user={user} /> : <DataPanel initialEventId={dataEventId} />}
+        {activeTab === 'overview' ? <DashboardOverview user={user} /> : activeTab === 'enquiries' ? <EnquiryPanel user={user} /> : activeTab === 'customers' ? <CustomerPanel user={user} /> : activeTab === 'events' ? <EventPanel user={user} onOpenGallery={(event) => { setDataEventId(event.id); setActiveTab('data'); }} /> : activeTab === 'team' ? <TeamPanel user={user} /> : activeTab === 'calendar' ? <CalendarPanel user={user} /> : activeTab === 'billing' ? <BillingPanel user={user} /> : activeTab === 'showcase' ? <ShowcasePanel user={user} /> : activeTab === 'settings' ? <StudioSettingsPanel /> : <DataPanel initialEventId={dataEventId} />}
       </div>
       <footer className="dashboard-footer"><Brand /><span>Your growth counts.</span><span>© 2026 FrameBucket</span></footer>
     </main>
@@ -2598,6 +2619,7 @@ function CustomerPortalPage({ customer, onLogout }) {
   const [locationEvent, setLocationEvent] = useState(null);
   const [locationBusy, setLocationBusy] = useState(false);
   const [galleryEvent, setGalleryEvent] = useState(null);
+  const [billingEvent, setBillingEvent] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -2678,7 +2700,7 @@ function CustomerPortalPage({ customer, onLogout }) {
         ) : (
           <div className="customer-table-scroll">
             <table className="customer-table customer-event-table">
-              <thead><tr><th scope="col">Event</th><th scope="col">Photographer</th><th scope="col">Event date</th><th scope="col">Time</th><th scope="col">Status</th><th scope="col">Assignee</th><th scope="col">Location</th><th scope="col">Photo Gallery</th></tr></thead>
+              <thead><tr><th scope="col">Event</th><th scope="col">Photographer</th><th scope="col">Event date</th><th scope="col">Time</th><th scope="col">Status</th><th scope="col">Assignee</th><th scope="col">Location</th><th scope="col">Photo Gallery</th><th scope="col">Payments & albums</th></tr></thead>
               <tbody>
                 {events.map((event, index) => (
                   <tr key={event.eventId || `${event.eventName}-${event.eventDate}-${index}`}>
@@ -2696,6 +2718,7 @@ function CustomerPortalPage({ customer, onLogout }) {
                       <button className="customer-id-link" type="button" onClick={() => setLocationEvent(event)}>{event.locationName ? 'Update location' : 'Add location details'}</button>
                     </div></td>
                     <td><button className="button button-dark button-small event-gallery-button" type="button" onClick={() => setGalleryEvent(event)}>{event.albumSubmitted ? 'Open gallery · sent' : 'Open gallery'}</button></td>
+                    <td><button className="button button-quiet button-small" type="button" onClick={() => setBillingEvent(event)}>View</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -2704,6 +2727,7 @@ function CustomerPortalPage({ customer, onLogout }) {
         )}
       </section>
       {locationEvent && <CustomerLocationModal event={locationEvent} busy={locationBusy} error={error} onClose={() => { if (!locationBusy) { setLocationEvent(null); setError(''); } }} onSave={saveLocation} />}
+      {billingEvent && <CustomerBillingModal event={billingEvent} onClose={() => setBillingEvent(null)} />}
       {galleryEvent && <CustomerGalleryModal event={galleryEvent} onClose={() => setGalleryEvent(null)} onSubmitted={() => {
         setGalleryEvent(null);
         setEvents((current) => current.map((event) => event.eventId === galleryEvent.eventId ? { ...event, albumSubmitted: true } : event));
@@ -2715,6 +2739,7 @@ function CustomerPortalPage({ customer, onLogout }) {
 }
 
 function CustomerGalleryModal({ event, onClose, onSubmitted }) {
+  const downloadPolicy = useCustomerDownloadPolicy(event.eventId);
   const [media, setMedia] = useState([]);
   const [folders, setFolders] = useState([]);
   const [folderId, setFolderId] = useState('__all');
@@ -2858,6 +2883,7 @@ function CustomerGalleryModal({ event, onClose, onSubmitted }) {
         <p className="gallery-modal-note">{event.albumSubmitted ? 'You have already sent a selection to your photographer. You can choose photos again and submit a new selection at any time; each one is sent as a new album-design request. Videos can be viewed and downloaded, but cannot be selected.' : 'Choose photos for album design. Your selection is saved while you move between folders. Videos can be viewed and downloaded, but cannot be selected for album design.'}</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         {notice && <p className="form-success" role="status">{notice}</p>}
+        {downloadPolicy.message && <p className="event-form-note" role="status">{downloadPolicy.message}</p>}
         {loading ? <p className="customer-empty">Loading event gallery…</p> : media.length === 0 ? (
           <div className="gallery-empty"><span aria-hidden="true">✦</span><h3>Your photographer is preparing this gallery.</h3><p>Check back once the processed event photos are ready.</p></div>
         ) : view === 'review' ? (
@@ -2880,8 +2906,8 @@ function CustomerGalleryModal({ event, onClose, onSubmitted }) {
                 </select>
               </label>
               <div className="customer-gallery-downloads">
-                <button className="button button-quiet" type="button" onClick={() => downloadPhotos([])} disabled={busy || media.length === 0}>Download all photos</button>
-                <button className="button button-dark" type="button" onClick={() => downloadPhotos(selectedIds)} disabled={busy || selectedIds.length === 0}>Download selected</button>
+                <button className="button button-quiet" type="button" onClick={() => downloadPhotos([])} disabled={busy || media.length === 0 || !downloadPolicy.allowed}>Download all photos</button>
+                <button className="button button-dark" type="button" onClick={() => downloadPhotos(selectedIds)} disabled={busy || selectedIds.length === 0 || !downloadPolicy.allowed}>Download selected</button>
               </div>
             </div>
             {savingSelection && <p className="gallery-selection-status" role="status">Saving selection to your temporary folder…</p>}
@@ -2931,7 +2957,7 @@ function CustomerGalleryModal({ event, onClose, onSubmitted }) {
                 <button className="button button-quiet" type="button" onClick={() => moveEnlargedPhoto(1)} disabled={navigablePhotos.length < 2}>Next →</button>
               </div>
               {<label className={`gallery-select-photo gallery-lightbox-selection ${selectedIds.includes(enlargedPhoto.photo_id) ? 'is-selected' : ''}`}><input type="checkbox" checked={selectedIds.includes(enlargedPhoto.photo_id)} onChange={(changeEvent) => togglePhoto(enlargedPhoto.photo_id, changeEvent.target.checked)} disabled={busy} /> select for album design</label>}
-              <button className="button button-dark" type="button" onClick={() => downloadPhotos([])} disabled={busy}>{busy ? 'Preparing download…' : 'Download all photos'}</button>
+              <button className="button button-dark" type="button" onClick={() => downloadPhotos([])} disabled={busy || !downloadPolicy.allowed}>{busy ? 'Preparing download…' : 'Download all photos'}</button>
             </div>
           </section>
         </div>}

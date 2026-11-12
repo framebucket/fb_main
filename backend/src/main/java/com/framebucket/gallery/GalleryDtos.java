@@ -20,13 +20,13 @@ public final class GalleryDtos {
             @Size(max = 255) String contentType
     ) {}
 
-    public record AlbumSubmissionRequest(@NotEmpty @Size(max = 5000) List<@NotBlank String> photoIds) {}
+    public record AlbumSubmissionRequest(@NotEmpty @Size(max = 50000) List<@NotBlank String> photoIds) {}
 
     public record AlbumSelectionUpdateRequest(
-            @NotNull @Size(max = 5000) List<@NotBlank String> photoIds
+            @NotNull @Size(max = 50000) List<@NotBlank String> photoIds
     ) {}
 
     public record GalleryDownloadRequest(
-            @Size(max = 5000) List<@NotBlank String> photoIds
+            @Size(max = 50000) List<@NotBlank String> photoIds
     ) {}
 }

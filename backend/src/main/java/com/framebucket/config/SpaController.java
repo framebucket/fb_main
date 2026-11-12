@@ -8,7 +8,8 @@ public class SpaController {
     @GetMapping({
             "/", "/register", "/verify-email", "/payment", "/login",
             "/dashboard", "/customer-portal",
-            "/quote/{token}", "/team-invite/{token}", "/event-checkin/{token}"
+            "/quote/{token}", "/team-invite/{token}", "/event-checkin/{token}",
+            "/portfolio/{slug}", "/flipbook/{token}"
     })
     public String forwardToApp() {
         return "forward:/index.html";

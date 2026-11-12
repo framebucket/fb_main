@@ -84,7 +84,9 @@ public class SecurityConfig {
                                 "/customer-portal",
                                 "/quote/**",
                                 "/team-invite/**",
-                                "/event-checkin/**"
+                                "/event-checkin/**",
+                                "/portfolio/**",
+                                "/flipbook/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/subscriptions").permitAll()
@@ -103,6 +105,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/customers/**", "/api/events", "/api/events/**", "/api/team", "/api/team/**", "/api/auth/me").hasRole("PHOTOGRAPHER")
                         .requestMatchers("/api/enquiries", "/api/enquiries/**").hasRole("PHOTOGRAPHER")
                         .requestMatchers("/api/dashboard/**").hasRole("PHOTOGRAPHER")
+                        .requestMatchers("/api/studio", "/api/studio/**").hasRole("PHOTOGRAPHER")
                         .requestMatchers("/api/customer-auth/me", "/api/customer-portal/**").hasRole("CUSTOMER")
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()

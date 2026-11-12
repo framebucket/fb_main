@@ -7,6 +7,7 @@ import com.framebucket.event.model.EventBooking;
 import com.framebucket.event.repository.EventBookingRepository;
 import com.framebucket.user.auth.model.PhotographerPrincipal;
 import com.framebucket.common.phone.IndianMobileNumber;
+import com.framebucket.studio.BillingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +29,7 @@ public class DataGalleryService {
     private final EnquiryEmailSender emailSender;
     private final WhatsAppTemplateSender whatsAppSender;
     private final GuestPhotoDeliveryService guestPhotoDeliveryService;
+    private final BillingService billing;
     private final String albumTemplate;
     private final String albumTemplateLanguage;
 
@@ -37,6 +39,7 @@ public class DataGalleryService {
             EnquiryEmailSender emailSender,
             WhatsAppTemplateSender whatsAppSender,
             GuestPhotoDeliveryService guestPhotoDeliveryService,
+            BillingService billing,
             @Value("${app.whatsapp.album-design-template:framebucket_album_selection_finalized}") String albumTemplate,
             @Value("${app.whatsapp.album-design-language:${app.whatsapp.language:en}}") String albumTemplateLanguage
     ) {
@@ -45,6 +48,7 @@ public class DataGalleryService {
         this.emailSender = emailSender;
         this.whatsAppSender = whatsAppSender;
         this.guestPhotoDeliveryService = guestPhotoDeliveryService;
+        this.billing = billing;
         this.albumTemplate = albumTemplate;
         this.albumTemplateLanguage = albumTemplateLanguage;
     }
@@ -157,6 +161,7 @@ public class DataGalleryService {
     public DataServiceClient.MediaStream downloadForCustomer(UUID eventId, CustomerPrincipal principal,
                                                               List<String> photoIds) {
         EventBooking event = customerEvent(eventId, principal);
+        billing.requireDownloadsAllowed(event.getId());
         ensureProvisioned(event);
         return dataService.downloadCustomerGallery(storageEventId(event), event.getCustomer().getId().toString(),
                 photoIds);
