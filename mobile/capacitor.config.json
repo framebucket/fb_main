@@ -1,0 +1,42 @@
+{
+  "appId": "in.framebucket.app",
+  "appName": "FrameBucket",
+  "webDir": "www",
+  "backgroundColor": "#1c1a17",
+  "appendUserAgent": "FrameBucketApp",
+  "server": {
+    "url": "https://fbmain-production.up.railway.app",
+    "cleartext": false,
+    "errorPath": "offline.html",
+    "allowNavigation": [
+      "fbmain-production.up.railway.app",
+      "fbdata-production.up.railway.app",
+      "framebucket.in",
+      "*.framebucket.in"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": false,
+    "webContentsDebuggingEnabled": false,
+    "adjustMarginsForEdgeToEdge": "force"
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "scrollEnabled": true,
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 800,
+      "launchAutoHide": true,
+      "backgroundColor": "#f1ece4",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "overlaysWebView": false,
+      "style": "DARK",
+      "backgroundColor": "#1c1a17"
+    }
+  }
+}

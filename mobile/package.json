@@ -1,0 +1,33 @@
+{
+  "name": "framebucket-mobile",
+  "version": "1.0.0",
+  "description": "FrameBucket Android and iOS apps (Capacitor wrapper around the live web app)",
+  "author": "SK FrameTech Solutions <info@framebucket.in>",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "android:prepare": "node scripts/build.mjs prepare android",
+    "apk": "node scripts/build.mjs apk",
+    "apk:release": "node scripts/build.mjs apk-release",
+    "aab": "node scripts/build.mjs aab",
+    "android:open": "node scripts/build.mjs prepare android && cap open android",
+    "ios:prepare": "node scripts/build.mjs prepare ios",
+    "ios:sim": "node scripts/build.mjs ios-sim",
+    "ios:open": "node scripts/build.mjs prepare ios && cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/core": "^7.4.0",
+    "@capacitor/filesystem": "^7.1.0",
+    "@capacitor/ios": "^7.4.0",
+    "@capacitor/share": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.4.0"
+  }
+}

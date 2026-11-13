@@ -1,3 +1,5 @@
+import { saveBlob } from './nativeSave.js';
+
 const apiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 let csrfToken = null;
 
@@ -210,14 +212,7 @@ async function downloadBlob(path, body, filename) {
     downloadFilename = regularFilename.trim();
   }
 
-  const objectUrl = URL.createObjectURL(await response.blob());
-  const link = document.createElement('a');
-  link.href = objectUrl;
-  link.download = String(downloadFilename || filename).replace(/[\\/]/g, '_');
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  await saveBlob(await response.blob(), String(downloadFilename || filename).replace(/[\\/]/g, '_'));
 }
 
 async function downloadAuthenticatedFile(path, filename) {
@@ -228,14 +223,7 @@ async function downloadAuthenticatedFile(path, filename) {
     try { payload = responseText ? JSON.parse(responseText) : null; } catch { payload = { detail: responseText }; }
     throw new Error(payload?.detail || payload?.message || `The download failed (HTTP ${response.status}).`);
   }
-  const objectUrl = URL.createObjectURL(await response.blob());
-  const link = document.createElement('a');
-  link.href = objectUrl;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  await saveBlob(await response.blob(), filename);
 }
 
 export const api = {
