@@ -31,6 +31,8 @@ public class CustomerAuthController {
     private final CustomerLoginService customerLoginService;
     private final SecurityContextRepository securityContextRepository;
     private final CsrfTokenRepository csrfTokenRepository;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.user.auth.login.DeviceSessionService deviceSessions;
     private final SecurityContextHolderStrategy contextHolderStrategy = SecurityContextHolder.getContextHolderStrategy();
 
     public CustomerAuthController(
@@ -81,6 +83,8 @@ public class CustomerAuthController {
         context.setAuthentication(authentication);
         contextHolderStrategy.setContext(context);
         securityContextRepository.saveContext(context, httpRequest, httpResponse);
+        deviceSessions.remember(httpRequest, httpResponse,
+                com.framebucket.user.auth.login.DeviceSessionService.Kind.CUSTOMER, null, principal.getMobileNumber());
 
         return CustomerLoginService.toProfile(principal);
     }

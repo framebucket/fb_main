@@ -26,6 +26,7 @@ public final class BookingDtos {
 
     public record CatalogResponse(
             BigDecimal albumSheetPrice,
+            int albumSheetsPerEvent,
             BigDecimal discountPercent,
             BigDecimal advancePercent,
             String contractTerms,
@@ -46,6 +47,7 @@ public final class BookingDtos {
 
     public record CatalogSettingsRequest(
             @NotNull @DecimalMin("0.00") @Digits(integer = 8, fraction = 2) BigDecimal albumSheetPrice,
+            @Min(1) @Max(200) Integer albumSheetsPerEvent,
             @NotNull @DecimalMin("0.00") @DecimalMax("90.00") BigDecimal discountPercent,
             @NotNull @DecimalMin("0.00") @DecimalMax("100.00") BigDecimal advancePercent,
             @Size(max = 20000) String contractTerms

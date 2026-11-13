@@ -13,6 +13,9 @@ checkout (otherwise those suites print `SKIPPED`).
 | `e2e_style.py` | AI editing style & studio logo (needs fb_data) |
 | `e2e_album.py` | AI album auto-design, PSD/JPEG downloads, send to proofing (needs fb_data) |
 | `e2e_invite.py` | client wedding invitations, designs, regenerate, MP4 (needs fb_data + ffmpeg) |
+| `e2e_otp.py` | WhatsApp-code sign-in for photographers and customers, remembered app sessions until an app update |
+| `e2e_presets.py` | editing presets: plan limits 3/5/10/25, upload, rename, delete, AI pick preview (needs fb_data) |
+| `e2e_refs.py` | reference album designs: Studio+ only (50/100), layout analysis, limits, thumbnails (needs fb_data) |
 
 Run locally:
 

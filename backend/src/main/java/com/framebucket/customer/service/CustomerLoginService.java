@@ -105,13 +105,17 @@ public class CustomerLoginService {
             return null;
         }
 
+        otp.consume(now);
+        return principalFor(mobileNumber);
+    }
+
+    /** The signed-in customer for a registered mobile number (used to restore remembered app sessions). */
+    @Transactional(readOnly = true)
+    public CustomerPrincipal principalFor(String mobileNumber) {
         var customers = customerRepository.findAllByMobileNumberOrderByCreatedAtDesc(mobileNumber);
         if (customers.isEmpty()) {
-            otp.consume(now);
             return null;
         }
-
-        otp.consume(now);
         Customer displayCustomer = customers.get(0);
         return new CustomerPrincipal(
                 displayCustomer.getName(),

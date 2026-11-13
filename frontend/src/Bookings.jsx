@@ -57,7 +57,7 @@ export function QuoteCatalogSettings({ user }) {
   useEffect(() => {
     if (!catalog.data) return;
     setData(catalog.data);
-    setSettings({ albumSheetPrice: catalog.data.albumSheetPrice, discountPercent: catalog.data.discountPercent, advancePercent: catalog.data.advancePercent, contractTerms: catalog.data.contractTerms });
+    setSettings({ albumSheetPrice: catalog.data.albumSheetPrice, albumSheetsPerEvent: catalog.data.albumSheetsPerEvent ?? 30, discountPercent: catalog.data.discountPercent, advancePercent: catalog.data.advancePercent, contractTerms: catalog.data.contractTerms });
   }, [catalog.data]);
 
   async function run(task, done) {
@@ -75,9 +75,10 @@ export function QuoteCatalogSettings({ user }) {
     <div className="growth-stack">
       {error && <p className="form-error customer-message" role="alert">{error}</p>}
       {notice && <p className="form-success customer-message" role="status">{notice}</p>}
-      <form className="customer-list-section studio-settings" onSubmit={(e) => { e.preventDefault(); run(() => api.saveQuoteSettings({ ...settings, albumSheetPrice: Number(settings.albumSheetPrice), discountPercent: Number(settings.discountPercent), advancePercent: Number(settings.advancePercent) }), 'Pricing settings saved.'); }}>
+      <form className="customer-list-section studio-settings" onSubmit={(e) => { e.preventDefault(); run(() => api.saveQuoteSettings({ ...settings, albumSheetPrice: Number(settings.albumSheetPrice), albumSheetsPerEvent: Number(settings.albumSheetsPerEvent) || 30, discountPercent: Number(settings.discountPercent), advancePercent: Number(settings.advancePercent) }), 'Pricing settings saved.'); }}>
         <fieldset><legend>Pricing</legend>
-          <label className="event-form-label">Album price per sheet (₹)<input type="number" min="0" step="1" value={settings.albumSheetPrice} onChange={(e) => setSettings({ ...settings, albumSheetPrice: e.target.value })} disabled={!canEdit} /></label>
+          <label className="event-form-label">Album price per sheet (₹)<input type="number" min="0" step="1" value={settings.albumSheetPrice} onChange={(e) => setSettings({ ...settings, albumSheetPrice: e.target.value })} disabled={!canEdit} /><small className="field-hint">Never shown to customers.</small></label>
+          <label className="event-form-label">Album sheets per event<input type="number" min="1" max="200" step="1" value={settings.albumSheetsPerEvent} onChange={(e) => setSettings({ ...settings, albumSheetsPerEvent: e.target.value })} disabled={!canEdit} /><small className="field-hint">When a customer ticks “Album”, each event adds {Number(settings.albumSheetsPerEvent) || 30} sheets = {inr((Number(settings.albumSheetsPerEvent) || 30) * (Number(settings.albumSheetPrice) || 0))} per event.</small></label>
           <label className="event-form-label">Standard discount on quotes (%)<input type="number" min="0" max="90" step="0.5" value={settings.discountPercent} onChange={(e) => setSettings({ ...settings, discountPercent: e.target.value })} disabled={!canEdit} /></label>
           <label className="event-form-label">Advance to confirm a booking (%)<input type="number" min="0" max="100" step="1" value={settings.advancePercent} onChange={(e) => setSettings({ ...settings, advancePercent: e.target.value })} disabled={!canEdit} /></label>
           <label className="event-form-label studio-span-2">Booking agreement terms<textarea rows="8" maxLength="20000" value={settings.contractTerms} onChange={(e) => setSettings({ ...settings, contractTerms: e.target.value })} disabled={!canEdit} /><span className="field-hint">Used for every new contract; you can still edit terms per client before sending.</span></label>

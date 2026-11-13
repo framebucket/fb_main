@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api.js';
 import './studio.css';
 
@@ -747,72 +747,294 @@ export function PublicPortfolioPage({ slug }) {
   );
 }
 
+// ---------------------------------------------------------------------------------------------
+// E-album flipbook: a book with a hard cover, pages that turn in 3D (click, swipe, drag or arrow
+// keys), page-edge thickness, thumbnails, slideshow and full screen.
+// ---------------------------------------------------------------------------------------------
+
+const TURN_MS = 760;
+
 export function FlipbookPage({ token }) {
   const book = useLoad(() => api.publicFlipbook(token), [token]);
-  const [spread, setSpread] = useState(0); // 0 = cover; on wide screens spread n shows pages 2n-1 and 2n
-  const [turning, setTurning] = useState('');
-  const [narrow, setNarrow] = useState(() => window.innerWidth < 760);
   const data = book.data;
   const pageCount = data?.pageCount || 0;
-  const maxSpread = narrow ? pageCount : Math.ceil(pageCount / 2);
+  const [narrow, setNarrow] = useState(() => window.innerWidth < 760);
+  // Wide: spread 0 = closed front cover, 1..K = open spreads (pages 2k-2 | 2k-1), K+1 = closed back cover.
+  // Narrow: one page at a time; 0 = cover, 1..P = pages, P+1 = back cover.
+  const last = narrow ? pageCount + 1 : Math.ceil(pageCount / 2) + 1;
+  const [spread, setSpread] = useState(0);
+  const [turn, setTurn] = useState(null); // { dir: 1 | -1, p: 0..1, animate: bool }
+  const [playing, setPlaying] = useState(false);
+  const [thumbs, setThumbs] = useState(false);
+  const bookRef = useRef(null);
+  const drag = useRef(null);
+  const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   useEffect(() => { if (data) document.title = `${data.title} · E-album`; }, [data]);
   useEffect(() => {
-    const onResize = () => { setNarrow(window.innerWidth < 760); setSpread(0); };
+    const onResize = () => {
+      const next = window.innerWidth < 760;
+      setNarrow((current) => { if (current !== next) setSpread(0); return next; });
+    };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  function go(direction) {
-    const next = Math.min(maxSpread, Math.max(0, spread + direction));
-    if (next === spread || turning) return;
-    setTurning(direction > 0 ? 'next' : 'prev');
-    setTimeout(() => { setSpread(next); setTurning(''); }, 420);
-  }
+  const finish = useCallbackRef((dir) => {
+    setSpread((value) => Math.min(last, Math.max(0, value + dir)));
+    setTurn(null);
+  });
 
+  const go = useCallbackRef((dir) => {
+    if (turn) return;
+    const next = spread + dir;
+    if (next < 0 || next > last) { setPlaying(false); return; }
+    if (reduced) { setSpread(next); return; }
+    setTurn({ dir, p: 0, animate: false });
+    requestAnimationFrame(() => requestAnimationFrame(() => setTurn({ dir, p: 1, animate: true })));
+  });
+
+  const jump = (target) => {
+    if (turn) return;
+    setSpread(Math.min(last, Math.max(0, target)));
+    setThumbs(false);
+  };
+
+  // Keyboard: arrows, Home/End, space for slideshow, F for full screen.
   useEffect(() => {
     function onKey(event) {
-      if (event.key === 'ArrowRight') go(1);
-      if (event.key === 'ArrowLeft') go(-1);
+      if (event.key === 'ArrowRight' || event.key === 'PageDown') go(1);
+      else if (event.key === 'ArrowLeft' || event.key === 'PageUp') go(-1);
+      else if (event.key === 'Home') jump(0);
+      else if (event.key === 'End') jump(last);
+      else if (event.key === ' ') { event.preventDefault(); setPlaying((value) => !value); }
+      else if (event.key.toLowerCase() === 'f') toggleFullscreen();
+      else if (event.key === 'Escape') setThumbs(false);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  if (book.loading) return <main className="studio-flipbook-shell"><p className="customer-empty">Opening album…</p></main>;
-  if (!data) return <main className="studio-flipbook-shell"><h1>Album not found</h1><p>This link may have been removed.</p></main>;
+  // Slideshow.
+  useEffect(() => {
+    if (!playing) return undefined;
+    if (spread >= last) { setPlaying(false); return undefined; }
+    const timer = window.setTimeout(() => go(1), spread === 0 ? 900 : 3200);
+    return () => window.clearTimeout(timer);
+  }, [playing, spread, turn, last, go]);
 
-  const page = (index) => (index >= 0 && index < pageCount ? <img src={api.publicFlipbookPageUrl(token, index)} alt={`Page ${index + 1}`} /> : <div className="studio-page-blank" />);
-  // Preload the next pages so turning feels instant.
-  const preload = narrow ? [spread] : [spread * 2, spread * 2 + 1];
+  function toggleFullscreen() {
+    const element = document.querySelector('.fb-flip-shell');
+    if (!document.fullscreenElement) element?.requestFullscreen?.().catch(() => {});
+    else document.exitFullscreen?.().catch(() => {});
+  }
+
+  // Dragging a page corner: follow the pointer, finish the turn if it's past a third of the way.
+  function onPointerDown(event) {
+    if (turn || event.button > 0) return;
+    const rect = bookRef.current.getBoundingClientRect();
+    const onRight = event.clientX - rect.left > rect.width / 2;
+    drag.current = { x: event.clientX, y: event.clientY, rect, dir: narrow ? 0 : onRight ? 1 : -1, moved: false, onRight };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+  function onPointerMove(event) {
+    const d = drag.current;
+    if (!d) return;
+    const dx = event.clientX - d.x;
+    if (!d.moved && Math.abs(dx) < 8) return;
+    if (!d.moved) {
+      d.moved = true;
+      if (narrow) d.dir = dx < 0 ? 1 : -1;
+      if (d.dir === 0 || spread + d.dir < 0 || spread + d.dir > last) { drag.current = null; return; }
+    }
+    const width = narrow ? d.rect.width : d.rect.width / 2;
+    const p = Math.max(0, Math.min(1, (d.dir === 1 ? -dx : dx) / (width * 1.6)));
+    setTurn({ dir: d.dir, p, animate: false });
+  }
+  function onPointerUp() {
+    const d = drag.current;
+    drag.current = null;
+    if (!d) return;
+    if (!d.moved) { go(d.onRight ? 1 : -1); return; }
+    setTurn((current) => {
+      if (!current) return current;
+      if (current.p > 0.33) return { ...current, p: 1, animate: true };
+      return { ...current, p: 0, animate: true, cancel: true };
+    });
+  }
+  function onLeafTransitionEnd(event) {
+    if (event.propertyName !== 'transform' || !turn) return;
+    if (turn.cancel) setTurn(null);
+    else if (turn.p >= 1) finish(turn.dir);
+  }
+
+  if (book.loading) return <main className="fb-flip-shell"><div className="fb-flip-loading"><span /><p>Opening album…</p></div></main>;
+  if (!data) return <main className="fb-flip-shell"><header className="fb-flip-header"><h1>Album not found</h1><p>This link may have been removed.</p></header></main>;
+
+  const url = (index) => api.publicFlipbookPageUrl(token, index);
+  const Cover = ({ back }) => (
+    <div className={`fb-cover${back ? ' is-back' : ''}`}>
+      {back ? (
+        <><span className="fb-cover-mark">{data.studioName}</span><small>{pageCount} pages · made with love</small></>
+      ) : (
+        <>
+          <span className="fb-cover-studio">{data.studioName}</span>
+          <span className="fb-cover-rule" />
+          <b className="fb-cover-title">{data.title}</b>
+          <span className="fb-cover-meta">{data.eventTypeName}{data.eventDate ? ` · ${shortDate(data.eventDate)}` : ''}</span>
+          <small className="fb-cover-hint">{narrow ? 'Swipe or tap to open' : 'Click, drag the corner or press → to open'}</small>
+        </>
+      )}
+    </div>
+  );
+  const Page = ({ index }) => {
+    if (index < 0 || index >= pageCount) return <div className="fb-paper is-blank" />;
+    return (
+      <div className="fb-paper">
+        <img src={url(index)} alt={`Page ${index + 1}`} draggable="false" loading="eager" />
+        <span className="fb-folio">{index + 1}</span>
+      </div>
+    );
+  };
+
+  // What each half (or the single page) shows for a given spread.
+  const wideSide = (s, side) => {
+    if (s <= 0) return side === 'right' ? { kind: 'cover' } : { kind: 'none' };
+    if (s > Math.ceil(pageCount / 2)) return side === 'left' ? { kind: 'back' } : { kind: 'none' };
+    return { kind: 'page', index: side === 'left' ? 2 * s - 2 : 2 * s - 1 };
+  };
+  const single = (s) => (s <= 0 ? { kind: 'cover' } : s > pageCount ? { kind: 'back' } : { kind: 'page', index: s - 1 });
+  const render = (face, side) => {
+    if (face.kind === 'cover') return <Cover />;
+    if (face.kind === 'back') return <Cover back />;
+    if (face.kind === 'none') return null;
+    if (face.kind === 'inside') return <div className={`fb-paper is-endpaper ${side || ''}`} />;
+    return <Page index={face.index} />;
+  };
+  // The inside of the covers is endpaper.
+  const insideFor = (face) => (face.kind === 'cover' || face.kind === 'back' ? { kind: 'inside' } : face);
+
+  const p = turn ? turn.p : 0;
+  let under;
+  let leaf = null;
+  if (narrow) {
+    if (turn && turn.dir === 1) {
+      under = single(spread + 1);
+      leaf = { side: 'single', front: single(spread), back: { kind: 'inside' }, angle: -180 * p };
+    } else if (turn && turn.dir === -1) {
+      under = single(spread);
+      leaf = { side: 'single', front: single(spread - 1), back: { kind: 'inside' }, angle: -180 * (1 - p) };
+    } else under = single(spread);
+  }
+  let left = wideSide(spread, 'left');
+  let right = wideSide(spread, 'right');
+  if (!narrow && turn) {
+    if (turn.dir === 1) {
+      right = wideSide(spread + 1, 'right');
+      leaf = { side: 'right', front: wideSide(spread, 'right'), back: insideFor(wideSide(spread + 1, 'left')), angle: -180 * p };
+      if (spread === 0) left = { kind: 'none' };
+    } else {
+      left = wideSide(spread - 1, 'left');
+      leaf = { side: 'left', front: wideSide(spread, 'left'), back: insideFor(wideSide(spread - 1, 'right')), angle: 180 * p };
+    }
+  }
+  if (!narrow) {
+    // Open spreads show endpaper behind the covers once the book is open.
+    if (spread > 0 && left.kind === 'none') left = { kind: 'inside' };
+  }
+  const closed = !narrow && !turn && (spread === 0 || spread === last);
+  const position = narrow
+    ? spread === 0 ? 'Cover' : spread > pageCount ? 'Back cover' : `Page ${spread} of ${pageCount}`
+    : spread === 0 ? 'Cover' : spread === last ? 'Back cover' : `Pages ${2 * spread - 1}–${Math.min(2 * spread, pageCount)} of ${pageCount}`;
+  const progress = last ? spread / last : 0;
+  const leftEdges = narrow ? 0 : Math.round(progress * 6);
+  const rightEdges = narrow ? 0 : 6 - leftEdges;
+  const backdrop = narrow ? (single(spread).kind === 'page' ? single(spread).index : null) : (wideSide(spread, 'right').kind === 'page' ? wideSide(spread, 'right').index : null);
+  const preload = [];
+  for (let i = -2; i <= 5; i += 1) {
+    const index = narrow ? spread - 1 + i : 2 * spread - 2 + i;
+    if (index >= 0 && index < pageCount) preload.push(index);
+  }
 
   return (
-    <main className="studio-flipbook-shell">
-      <header><p className="eyebrow">{data.studioName}</p><h1>{data.title}</h1><p>{data.eventTypeName}{data.eventDate ? ` · ${shortDate(data.eventDate)}` : ''} · {pageCount} pages</p></header>
-      <div
-        className={`studio-book${narrow ? ' is-single' : ''}${turning ? ` turning-${turning}` : ''}`}
-        onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); go(e.clientX - rect.left > rect.width / 2 ? 1 : -1); }}
-        onTouchStart={(e) => { e.currentTarget.dataset.x = e.touches[0].clientX; }}
-        onTouchEnd={(e) => { const dx = e.changedTouches[0].clientX - Number(e.currentTarget.dataset.x || 0); if (Math.abs(dx) > 40) { e.preventDefault(); go(dx < 0 ? 1 : -1); } }}
-      >
-        {spread === 0 ? (
-          <div className="studio-book-cover"><span>{data.studioName}</span><b>{data.title}</b><small>Tap or press → to open</small></div>
-        ) : narrow ? (
-          <div className="studio-book-page">{page(spread - 1)}</div>
-        ) : (
-          <>
-            <div className="studio-book-page left">{page(spread * 2 - 2)}</div>
-            <div className="studio-book-page right">{page(spread * 2 - 1)}</div>
-          </>
-        )}
+    <main className={`fb-flip-shell${narrow ? ' is-narrow' : ''}`}>
+      {backdrop !== null && <div className="fb-flip-ambient" style={{ backgroundImage: `url("${url(backdrop)}")` }} aria-hidden="true" />}
+      <header className="fb-flip-header">
+        <p>{data.studioName}</p>
+        <h1>{data.title}</h1>
+        <span>{data.eventTypeName}{data.eventDate ? ` · ${shortDate(data.eventDate)}` : ''} · {pageCount} pages</span>
+      </header>
+
+      <div className="fb-stage">
+        <div
+          ref={bookRef}
+          className={`fb-book${narrow ? ' is-single' : ''}${closed ? (spread === 0 ? ' is-closed-front' : ' is-closed-back') : ''}${turn ? ' is-turning' : ''}`}
+          style={{ '--p': p }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={() => { drag.current = null; setTurn((current) => (current && !current.animate ? { ...current, p: 0, animate: true, cancel: true } : current)); }}
+          role="region"
+          aria-label={`${data.title}: ${position}`}
+        >
+          {!narrow && <div className="fb-edges is-left" style={{ '--n': leftEdges }} aria-hidden="true" />}
+          {!narrow && <div className="fb-edges is-right" style={{ '--n': rightEdges }} aria-hidden="true" />}
+          {narrow ? (
+            <div className="fb-half is-single">{render(under)}{turn && <div className="fb-cast" />}</div>
+          ) : (
+            <>
+              <div className="fb-half is-left">{render(left, 'left')}{turn?.dir === -1 && <div className="fb-cast is-left" />}</div>
+              <div className="fb-half is-right">{render(right, 'right')}{turn?.dir === 1 && <div className="fb-cast is-right" />}</div>
+              {!closed && <div className="fb-gutter" aria-hidden="true" />}
+            </>
+          )}
+          {leaf && (
+            <div
+              className={`fb-leaf is-${leaf.side}${turn.animate ? ' is-animating' : ''}`}
+              style={{ transform: `rotateY(${leaf.angle}deg)`, transitionDuration: turn.animate ? `${Math.round(TURN_MS * (turn.cancel ? 0.5 : 1))}ms` : '0ms' }}
+              onTransitionEnd={onLeafTransitionEnd}
+            >
+              <div className="fb-leaf-face is-front">{render(leaf.front, leaf.side)}<div className="fb-shade is-front" /></div>
+              <div className="fb-leaf-face is-back">{render(leaf.back, leaf.side === 'right' ? 'left' : 'right')}<div className="fb-shade is-back" /></div>
+            </div>
+          )}
+        </div>
       </div>
-      <div className="studio-book-controls">
-        <button className="button button-quiet" type="button" onClick={() => go(-1)} disabled={spread === 0}>‹ Previous</button>
-        <span>{spread === 0 ? 'Cover' : narrow ? `Page ${spread} of ${pageCount}` : `Pages ${spread * 2 - 1}–${Math.min(spread * 2, pageCount)} of ${pageCount}`}</span>
-        <button className="button button-dark" type="button" onClick={() => go(1)} disabled={spread >= maxSpread}>Next ›</button>
-      </div>
-      <div hidden>{preload.filter((i) => i < pageCount).map((i) => <img key={i} src={api.publicFlipbookPageUrl(token, i)} alt="" />)}</div>
+
+      <nav className="fb-controls" aria-label="Album controls">
+        <button type="button" onClick={() => go(-1)} disabled={spread === 0 || Boolean(turn)} aria-label="Previous page">‹</button>
+        <button type="button" className="fb-pill" onClick={() => setThumbs((value) => !value)} aria-expanded={thumbs}>{position}</button>
+        <button type="button" onClick={() => go(1)} disabled={spread >= last || Boolean(turn)} aria-label="Next page">›</button>
+        <span className="fb-controls-sep" />
+        <button type="button" onClick={() => { if (spread >= last) setSpread(0); setPlaying((value) => !value); }} aria-label={playing ? 'Pause slideshow' : 'Play slideshow'} title="Slideshow (space)">{playing ? '❚❚' : '▶'}</button>
+        <button type="button" onClick={toggleFullscreen} aria-label="Full screen" title="Full screen (F)">⤢</button>
+      </nav>
+      <div className="fb-progress" aria-hidden="true"><span style={{ width: `${progress * 100}%` }} /></div>
+
+      {thumbs && (
+        <div className="fb-thumbs" role="dialog" aria-label="Pages">
+          <button type="button" className={spread === 0 ? 'is-current' : ''} onClick={() => jump(0)}><span className="fb-thumb-cover">Cover</span></button>
+          {Array.from({ length: pageCount }, (_, index) => {
+            const target = narrow ? index + 1 : Math.floor(index / 2) + 1;
+            return (
+              <button type="button" key={index} className={target === spread ? 'is-current' : ''} onClick={() => jump(target)}>
+                <img src={url(index)} alt="" loading="lazy" /><small>{index + 1}</small>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div hidden>{preload.map((index) => <img key={index} src={url(index)} alt="" />)}</div>
       {data.poweredByFrameBucket !== false && <footer className="studio-public-footer">Powered by FrameBucket</footer>}
     </main>
   );
 }
+
+/** A stable function that always calls the latest version of `fn` (for timers and listeners). */
+function useCallbackRef(fn) {
+  const ref = useRef(fn);
+  ref.current = fn;
+  return useRef((...args) => ref.current(...args)).current;
+}
+

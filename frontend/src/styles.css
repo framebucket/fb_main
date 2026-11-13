@@ -963,3 +963,24 @@ input[type='date'], input[type='time'] { color-scheme: inherit; }
   .account-menu { gap: 6px; }
   .account-menu .button-small { padding: 0 12px; }
 }
+
+/* Quote page: album is a single tick box; the per-sheet price stays with the studio. */
+.quote-album-choice { position: relative; display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px; border-radius: 16px; border: 1px solid var(--fb-line-strong); background: var(--fb-raised); cursor: pointer; transition: border-color .2s ease, background .2s ease; }
+.quote-album-choice:hover { border-color: var(--fb-brass-line); }
+.quote-album-choice.selected { border-color: var(--fb-brass); background: var(--fb-brass-soft); }
+.quote-album-choice input { position: absolute; opacity: 0; pointer-events: none; }
+.quote-album-choice input:focus-visible + .quote-album-check { outline: 2px solid var(--fb-brass); outline-offset: 2px; }
+.quote-album-check { flex: none; width: 24px; height: 24px; margin-top: 1px; border-radius: 7px; border: 2px solid var(--fb-line-strong); display: grid; place-items: center; color: var(--fb-on-brass); font-size: 14px; font-weight: 800; }
+.quote-album-choice.selected .quote-album-check { background: var(--fb-brass); border-color: var(--fb-brass); }
+.quote-album-choice > span:last-child { display: grid; gap: 4px; }
+.quote-album-choice b { color: var(--fb-text); font-size: 15px; }
+.quote-album-choice small { color: var(--fb-muted); font-size: 13px; line-height: 1.5; }
+
+/* WhatsApp code sign-in */
+.otp-sent { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, #25d366 10%, transparent); border: 1px solid color-mix(in srgb, #25d366 30%, transparent); }
+.otp-sent-icon { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #25d366; color: #fff; }
+.otp-sent strong { display: block; font-size: 14px; }
+.otp-sent small { display: block; margin-top: 2px; color: var(--fb-muted); font-size: 12.5px; line-height: 1.45; }
+.otp-input { font-size: 22px !important; letter-spacing: 0.5em; text-align: center; font-variant-numeric: tabular-nums; }
+.otp-actions { justify-content: space-between; }
+.otp-actions button:disabled { color: var(--fb-muted); cursor: default; text-decoration: none; }

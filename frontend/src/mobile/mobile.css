@@ -538,3 +538,11 @@ button.m-stat { cursor: pointer; }
 .m-login { padding-bottom: calc(var(--m-safe-bottom) + var(--m-kb) + 24px); }
 .m-sheet-body { scroll-padding: 24px 0 96px; }
 .m-scroll { scroll-padding: 72px 0 calc(var(--m-kb) + 96px); }
+
+/* WhatsApp code sign-in */
+.m-otp-note { display: flex; gap: 10px; align-items: flex-start; padding: 11px 12px; border-radius: 14px; background: color-mix(in srgb, #25d366 11%, transparent); border: 1px solid color-mix(in srgb, #25d366 28%, transparent); }
+.m-otp-icon { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #25d366; color: #fff; }
+.m-otp-note strong { display: block; font-size: 14px; }
+.m-otp-note small { display: block; margin-top: 2px; opacity: 0.7; font-size: 12.5px; line-height: 1.4; }
+.m-otp-input { font-size: 24px !important; letter-spacing: 0.5em; text-align: center; font-variant-numeric: tabular-nums; }
+.m-login-links button:disabled { opacity: 0.5; }

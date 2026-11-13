@@ -211,3 +211,51 @@
 
 /* Client portal: album design waiting for approval */
 .customer-album-review-banner { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin: 0 0 16px; padding: 14px 18px; border-radius: 14px; border: 1px solid var(--fb-brass); background: color-mix(in srgb, var(--fb-brass) 12%, transparent); color: var(--fb-text); }
+
+/* Editing presets */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.preset-intro { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; }
+.preset-intro p { margin: 0; }
+.preset-count { flex: none; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 650; background: color-mix(in srgb, var(--fb-brass) 14%, transparent); color: var(--fb-brass); white-space: nowrap; }
+.preset-count.is-full { background: color-mix(in srgb, #c0392b 12%, transparent); color: #c0392b; }
+.preset-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
+.preset-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--fb-line, rgba(0,0,0,.08)); border-radius: 12px; background: var(--fb-surface, transparent); }
+.preset-swatches { display: flex; }
+.preset-swatches span { width: 18px; height: 34px; }
+.preset-swatches span:first-child { border-radius: 8px 0 0 8px; }
+.preset-swatches span:last-child { border-radius: 0 8px 8px 0; }
+.preset-main { display: grid; gap: 2px; min-width: 0; }
+.preset-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preset-main small { color: var(--fb-muted); font-size: 12px; line-height: 1.4; }
+.preset-skipped { font-style: italic; }
+.preset-rename { display: flex; gap: 8px; align-items: center; }
+.preset-rename input { min-width: 0; flex: 1; }
+.preset-scene select, .preset-upload-scene select { min-width: 0; }
+.preset-actions { display: flex; gap: 10px; }
+.preset-upload { align-items: flex-end; }
+.preset-upload-scene { flex-direction: row; align-items: center; gap: 8px; margin: 0; }
+.button.is-disabled { opacity: .5; cursor: not-allowed; }
+@container (max-width: 620px) {
+  .preset-row { grid-template-columns: auto minmax(0, 1fr); }
+  .preset-scene, .preset-actions { grid-column: 2; }
+}
+@media (max-width: 620px) {
+  .preset-row { grid-template-columns: auto minmax(0, 1fr); }
+  .preset-scene, .preset-actions { grid-column: 2; }
+  .preset-intro { flex-direction: column; gap: 8px; }
+}
+
+/* Reference album designs */
+.reference-grid { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.reference-card { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--fb-line, rgba(0,0,0,.08)); border-radius: 12px; }
+.reference-thumb { position: relative; aspect-ratio: 2 / 1; border-radius: 8px; overflow: hidden; background: #eee; }
+.reference-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.reference-thumb svg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .2s; }
+.reference-card:hover .reference-thumb svg, .reference-card:focus-within .reference-thumb svg { opacity: 1; }
+.reference-thumb rect { fill: rgba(255,255,255,.18); stroke: #fff; stroke-width: .6; vector-effect: non-scaling-stroke; }
+.reference-thumb line { stroke: rgba(255,255,255,.7); stroke-dasharray: 2 2; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.reference-meta { display: grid; min-width: 0; }
+.reference-meta strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.reference-meta small { color: var(--fb-muted); font-size: 12px; }
+.reference-card .studio-danger-link { justify-self: start; }
+.reference-problems { margin: 0; padding-left: 18px; }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
-import { UpgradeNotice, hasFeature } from './Plans.jsx';
+import { PlanLimitMessage, UpgradeNotice, hasFeature } from './Plans.jsx';
 import { Modal, inr, shortDate, useLoad } from './Studio.jsx';
 import { StudioMark, brandStyle } from './Bookings.jsx';
 import { CrewTab, GearCostsTab } from './Crew.jsx';
@@ -541,6 +541,175 @@ export function BrandingSettings() {
   );
 }
 
+// ---- Editing presets: upload Lightroom presets / LUTs once; the AI picks the right one for every photo
+const PRESET_SCENES = [['any', 'Any photo'], ['outdoor', 'Daylight outdoors'], ['indoor', 'Indoor / venue'], ['night', 'Night & low light'], ['portrait', 'Portraits & close-ups']];
+const PRESET_KIND = { xmp: 'Lightroom preset', lrtemplate: 'Lightroom Classic preset', cube: '3D LUT' };
+
+export function EditingPresetSettings() {
+  const loaded = useLoad(() => api.editingPresets(), []);
+  const [data, setData] = useState(null);
+  const [scene, setScene] = useState('any');
+  const [limitError, setLimitError] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const { busy, run, messages, setError } = useAction();
+  useEffect(() => { if (loaded.data) setData(loaded.data); }, [loaded.data]);
+  useEffect(() => () => { if (preview?.before) URL.revokeObjectURL(preview.before); }, [preview]);
+  if (!data) return <p className="customer-empty">{loaded.error || 'Loading…'}</p>;
+  const limit = data.limit;
+  const full = limit !== null && limit !== undefined && data.count >= limit;
+
+  const upload = async (files) => {
+    setLimitError(null);
+    let latest = null;
+    for (const file of files) {
+      try {
+        latest = await api.uploadEditingPreset(file, { scene });
+      } catch (requestError) {
+        if (requestError.code === 'PLAN_UPGRADE_REQUIRED') { setLimitError(requestError); break; }
+        setError(`${file.name}: ${requestError.message}`);
+        break;
+      }
+    }
+    if (latest) setData(latest);
+  };
+  const tryOn = async (file, presetId) => {
+    if (!file) return;
+    setPreviewBusy(true); setError('');
+    try {
+      const result = await api.previewEditingPreset(file, presetId);
+      setPreview({ before: URL.createObjectURL(file), after: result.image, preset: result.preset, scene: result.scene, file });
+    } catch (requestError) { setError(requestError.message); } finally { setPreviewBusy(false); }
+  };
+
+  return (
+    <section className="customer-list-section studio-settings preset-settings">
+      <fieldset><legend>Editing presets</legend>
+        <div className="studio-span-2 preset-intro">
+          <p className="event-form-note">Upload your own Lightroom presets (<b>.xmp</b>, <b>.lrtemplate</b>) or LUTs (<b>.cube</b>) once. For every photo you upload, FrameBucket picks the preset that suits it best (light, skin tones, scene) and finishes the photo on top of it. Originals are never changed.</p>
+          <span className={`preset-count${full ? ' is-full' : ''}`}>{data.count} of {limit === null || limit === undefined ? 'unlimited' : limit} used</span>
+        </div>
+        {limitError && <div className="studio-span-2"><PlanLimitMessage error={limitError} /></div>}
+        {messages}
+        {data.presets.length > 0 && (
+          <ul className="preset-list studio-span-2">
+            {data.presets.map((preset) => (
+              <li key={preset.id} className="preset-row">
+                <span className="preset-swatches" aria-hidden="true">{preset.swatches.map((colour) => <span key={colour} style={{ background: colour }} />)}</span>
+                <div className="preset-main">
+                  {editing?.id === preset.id ? (
+                    <form className="preset-rename" onSubmit={async (event) => { event.preventDefault(); const r = await run(() => api.updateEditingPreset(preset.id, { name: editing.name }), 'Renamed.'); if (r) { setData(r); setEditing(null); } }}>
+                      <input value={editing.name} maxLength="80" autoFocus onChange={(event) => setEditing({ ...editing, name: event.target.value })} />
+                      <button className="button button-dark button-small" type="submit" disabled={busy || !editing.name.trim()}>Save</button>
+                      <button className="customer-id-link" type="button" onClick={() => setEditing(null)}>Cancel</button>
+                    </form>
+                  ) : <strong>{preset.name}</strong>}
+                  <small>{PRESET_KIND[preset.kind] || preset.kind} · {preset.words.join(' · ')}</small>
+                  {preset.skipped.length > 0 && <small className="preset-skipped">Not applied (local effects): {preset.skipped.join(', ')}</small>}
+                </div>
+                <label className="preset-scene"><span className="sr-only">Best for</span>
+                  <select value={preset.scene} disabled={busy} onChange={async (event) => { const r = await run(() => api.updateEditingPreset(preset.id, { scene: event.target.value })); if (r) setData(r); }}>
+                    {PRESET_SCENES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </label>
+                <div className="preset-actions">
+                  <button className="customer-id-link" type="button" onClick={() => setEditing({ id: preset.id, name: preset.name })}>Rename</button>
+                  {preview?.file && <button className="customer-id-link" type="button" disabled={previewBusy} onClick={() => tryOn(preview.file, preset.id)}>Try</button>}
+                  <button className="customer-id-link studio-danger-link" type="button" disabled={busy} onClick={async () => { if (!window.confirm(`Delete "${preset.name}"? Photos already processed keep their edit.`)) return; const r = await run(() => api.deleteEditingPreset(preset.id), 'Preset deleted. You can upload another.'); if (r) setData(r); }}>Delete</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="growth-inline-actions studio-span-2 preset-upload">
+          <label className="event-form-label preset-upload-scene">Best for<select value={scene} onChange={(event) => setScene(event.target.value)}>{PRESET_SCENES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label className={`button button-dark button-small${full ? ' is-disabled' : ''}`} aria-disabled={full}>{full ? 'Limit reached' : 'Upload presets'}<input hidden multiple type="file" accept=".xmp,.lrtemplate,.cube" disabled={busy || full} onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ''; upload(files); }} /></label>
+          {full && <span className="field-hint">Delete a preset to upload a new one{limit < 25 ? <>, or <a className="customer-id-link" href="/#pricing">upgrade for more</a></> : ''}.</span>}
+        </div>
+        {data.presets.length > 0 && (
+          <>
+            <label className="studio-check studio-span-2"><input type="checkbox" checked={data.use_presets} disabled={busy} onChange={async (event) => { const r = await run(() => api.editingPresetSettings(event.target.checked), event.target.checked ? 'New uploads will use your presets.' : 'Presets paused for new uploads.'); if (r) setData(r); }} />Let AI pick a preset for every new upload</label>
+            <div className="growth-inline-actions studio-span-2">
+              <label className="button button-quiet button-small">See which preset AI picks<input hidden type="file" accept="image/jpeg,image/png,image/webp,image/tiff" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; tryOn(file); }} /></label>
+              {previewBusy && <span className="field-hint">Rendering preview…</span>}
+            </div>
+          </>
+        )}
+        {preview?.after && (
+          <div className="growth-before-after studio-span-2">
+            <figure><img src={preview.before} alt="Your photo before" /><figcaption>Before</figcaption></figure>
+            <figure><img src={preview.after} alt="After the chosen preset" /><figcaption>{preview.preset ? <>Preset: <b>{preview.preset}</b></> : 'Processed'}{preview.scene ? ` · looks like ${PRESET_SCENES.find(([value]) => value === preview.scene)?.[1].toLowerCase() || preview.scene}` : ''}</figcaption></figure>
+          </div>
+        )}
+      </fieldset>
+    </section>
+  );
+}
+
+// ---- Reference album designs (Studio+): finished spreads the AI album designer follows sheet by sheet
+export function AlbumReferenceSettings() {
+  const loaded = useLoad(() => api.albumReferences(), []);
+  const [data, setData] = useState(null);
+  const [limitError, setLimitError] = useState(null);
+  const [problems, setProblems] = useState([]);
+  const { busy, run, messages, setError } = useAction();
+  useEffect(() => { if (loaded.data) setData(loaded.data); }, [loaded.data]);
+  if (!data) return <p className="customer-empty">{loaded.error || 'Loading…'}</p>;
+  if (!data.planAllows) {
+    return <UpgradeNotice limitKey="albumReferences" title="Reference album designs">Upload album spreads you've designed before (up to 50 on Studio, 100 on Business). The AI album designer picks the closest one for every sheet and lays your client's photos out the same way.</UpgradeNotice>;
+  }
+  const limit = data.limit;
+  const full = limit !== null && limit !== undefined && data.count >= limit;
+  const upload = async (files) => {
+    setLimitError(null); setProblems([]); setError('');
+    try {
+      const result = await run(async () => {
+        try { return await api.uploadAlbumReferences(files); } catch (requestError) { if (requestError.code === 'PLAN_UPGRADE_REQUIRED') { setLimitError(requestError); return null; } throw requestError; }
+      });
+      if (result) { setData(result); setProblems(result.problems || []); }
+    } catch { /* shown by run */ }
+  };
+  return (
+    <section className="customer-list-section studio-settings">
+      <fieldset><legend>Reference album designs</legend>
+        <div className="studio-span-2 preset-intro">
+          <p className="event-form-note">Upload finished spreads from albums you've designed (JPG or PNG exports, both pages side by side). When you create an AI album, every sheet follows the reference whose layout best fits its photos: same photo positions, frames and background colour. Sheets with no close match use FrameBucket's own layouts.</p>
+          <span className={`preset-count${full ? ' is-full' : ''}`}>{data.count} of {limit ?? 'unlimited'} used</span>
+        </div>
+        {limitError && <div className="studio-span-2"><PlanLimitMessage error={limitError} /></div>}
+        {messages}
+        {problems.length > 0 && <ul className="studio-span-2 form-error reference-problems">{problems.map((problem) => <li key={problem}>{problem}</li>)}</ul>}
+        {data.references.length > 0 && (
+          <ul className="reference-grid studio-span-2">
+            {data.references.map((reference) => (
+              <li key={reference.id} className="reference-card">
+                <div className="reference-thumb">
+                  <img src={api.albumReferenceThumbUrl(reference.id)} alt={reference.name} loading="lazy" />
+                  <svg viewBox="0 0 100 50" preserveAspectRatio="none" aria-hidden="true">
+                    {reference.boxes.map(([x, y, w, h], index) => <rect key={index} x={x * 100} y={y * 50} width={w * 100} height={h * 50} />)}
+                    <line x1="50" y1="0" x2="50" y2="50" />
+                  </svg>
+                </div>
+                <div className="reference-meta">
+                  <strong title={reference.filename}>{reference.name}</strong>
+                  <small>{reference.count} {reference.count === 1 ? 'photo' : 'photos'} · {reference.kind}</small>
+                </div>
+                <button className="customer-id-link studio-danger-link" type="button" disabled={busy} onClick={async () => { const r = await run(() => api.deleteAlbumReference(reference.id), 'Reference removed.'); if (r) setData(r); }}>Delete</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="growth-inline-actions studio-span-2">
+          <label className={`button button-dark button-small${full ? ' is-disabled' : ''}`} aria-disabled={full}>{full ? 'Limit reached' : 'Upload spreads'}<input hidden multiple type="file" accept="image/jpeg,image/png,image/webp" disabled={busy || full} onChange={(event) => { const files = Array.from(event.target.files || []).slice(0, 25); event.target.value = ''; upload(files); }} /></label>
+          {busy && <span className="field-hint">Reading layouts…</span>}
+          {full && <span className="field-hint">Delete a reference to add another.</span>}
+        </div>
+      </fieldset>
+    </section>
+  );
+}
+
 // ---- Editing style: learn the studio's look from its own finished photos; stamp the logo away from faces
 export function EditingStyleSettings() {
   const loaded = useLoad(() => api.editingStyle(), []);
@@ -554,7 +723,7 @@ export function EditingStyleSettings() {
   useEffect(() => { if (data) setForm({ strength: data.strength, applyStyle: data.apply_style, stampLogo: data.stamp_logo }); }, [data]);
   useEffect(() => () => { if (preview.before) URL.revokeObjectURL(preview.before); if (preview.after) URL.revokeObjectURL(preview.after); }, [preview]);
   if (!data || !form) return <p className="customer-empty">{loaded.error || 'Loading…'}</p>;
-  if (!data.planAllows) return <UpgradeNotice feature="CUSTOM_BRANDING" title="Editing style">Teach FrameBucket your editing look from your own finished photos and apply it to every upload, with your logo placed clear of faces.</UpgradeNotice>;
+  if (!data.planAllows) return <div className="growth-stack"><EditingPresetSettings /><UpgradeNotice feature="CUSTOM_BRANDING" title="Learn your editing look">Teach FrameBucket your editing look from your own finished photos and apply it to every upload, with your logo placed clear of faces.</UpgradeNotice><AlbumReferenceSettings /></div>;
 
   const learn = async (files) => {
     if (files.length < 5) { setError('Choose at least 5 finished photos (up to 40) that show your look.'); return; }
@@ -574,21 +743,23 @@ export function EditingStyleSettings() {
 
   return (
     <div className="growth-stack">
+      <EditingPresetSettings />
       {messages}
       <section className="customer-list-section studio-settings">
-        <fieldset><legend>Your look</legend>
+        <fieldset><legend>Your look (learned from finished photos)</legend>
           {data.has_style ? (
             <div className="studio-span-2 growth-style-summary">
               <div className="growth-swatches">{(summary?.swatches || []).map((colour) => <span key={colour} style={{ background: colour }} title={colour} />)}</div>
               <div><strong>Learned from {data.reference_count} photos</strong><p>{(summary?.words || []).join(' · ')}</p></div>
             </div>
-          ) : <p className="event-form-note studio-span-2">Upload 15–40 of your own finished photos that show the look you want: a mix of portraits, candids and décor, in different light. FrameBucket learns the tones, colours and contrast and applies the same look to every photo you upload.</p>}
+          ) : <p className="event-form-note studio-span-2">No presets? Upload 15–40 of your own finished photos that show the look you want: a mix of portraits, candids and décor, in different light. FrameBucket learns the tones, colours and contrast and applies the same look to every photo you upload.</p>}
           <div className="growth-inline-actions studio-span-2">
             <label className="button button-dark button-small">{data.has_style ? 'Re-learn from new photos' : 'Choose reference photos'}<input hidden multiple type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={(e) => { const files = Array.from(e.target.files || []); e.target.value = ''; learn(files); }} /></label>
             {data.has_style && <button className="customer-id-link studio-danger-link" type="button" disabled={busy} onClick={async () => { const r = await run(() => api.clearEditingStyle(), 'Look removed. New uploads get basic corrections only.'); if (r) { setData(r); setPreview({ before: '', after: '' }); } }}>Remove look</button>}
             {busy && <span className="field-hint">Analysing photos…</span>}
           </div>
           <p className="event-form-note studio-span-2">Use photos you edited yourself. FrameBucket also learns how your camera's photos look before editing ({data.baseline_samples} uploads so far); the match improves after about 30 uploads.</p>
+          <p className="event-form-note studio-span-2">If you've uploaded editing presets, those are applied first; this look then helps the AI choose the closest preset for each photo.</p>
         </fieldset>
       </section>
 
@@ -619,6 +790,7 @@ export function EditingStyleSettings() {
           </fieldset>
         </section>
       )}
+      <AlbumReferenceSettings />
     </div>
   );
 }

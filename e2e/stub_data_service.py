@@ -3,7 +3,7 @@
 Gallery/outbox/download endpoints are canned fixtures, and every request is logged so the suites can
 check that Java sends the right event / customer IDs and the service key.
 
-The editing-style, album-design and invitation endpoints run the REAL fb_data code in-process when
+The editing-style, preset, album-reference, album-design and invitation endpoints run the REAL fb_data code in-process when
 FB_DATA_SRC points at a checkout of the fb_data repository (with its dependencies installed) and
 FB_DATA_DATABASE_URL at the test database; otherwise they answer 501 and those suites are skipped.
 
@@ -152,6 +152,10 @@ class H(BaseHTTPRequestHandler):
                 buf = io.BytesIO()
                 with zipfile.ZipFile(buf, "w") as z: z.writestr("00001_IMG_1.jpg", jpeg((10, 10, 10)))
                 return self._send(200, buf.getvalue(), "application/zip")
+        if len(p) >= 6 and p[1:4] == ["api", "v1", "studios"] and p[5] == "presets":
+            return self._presets(method, p[4], p[6:], q, body)
+        if len(p) >= 6 and p[1:4] == ["api", "v1", "studios"] and p[5] == "album-references":
+            return self._references(method, p[4], p[6:], q, body)
         if len(p) >= 6 and p[1:4] == ["api", "v1", "studios"] and p[5] == "style":
             return self._style(method, p[4], p[6:], q, body)
         return self._send(404, {"detail": f"stub has no route for {method} {u.path}"})
@@ -175,6 +179,58 @@ class H(BaseHTTPRequestHandler):
         except ValueError as e:
             return self._send(422, {"detail": str(e)})
         return self._send(404, {"detail": "no style route"})
+
+    def _presets(self, method, pid, rest, q, body):
+        """Editing presets, served by the REAL data-service code (mirrors app/api.py)."""
+        svc = real_service()
+        from app.service import PresetLimitReached
+        from app.presets import PresetError
+        try:
+            if rest == [] and method == "GET": return self._send(200, svc.studio_presets(pid))
+            if rest == ["settings"] and method == "PUT":
+                return self._send(200, svc.set_use_presets(pid, json.loads(body)["use_presets"]))
+            if len(rest) == 1 and rest[0] not in ("preview", "settings") and method == "PATCH":
+                d = json.loads(body or b"{}"); return self._send(200, svc.update_preset(pid, rest[0], d.get("name"), d.get("scene")))
+            if len(rest) == 1 and method == "DELETE": return self._send(200, svc.delete_preset(pid, rest[0]))
+            parts = multipart(self.headers.get("Content-Type", ""), body)
+            fields = {name: (fn, data) for name, fn, data in parts}
+            if rest == [] and method == "POST":
+                fn, data = fields["file"]
+                name = fields.get("name", (None, b""))[1].decode() or None
+                scene = fields.get("scene", (None, b"any"))[1].decode()
+                return self._send(200, svc.add_preset(pid, fn, data, name, scene, int(q["limit"]) if "limit" in q else None))
+            if rest == ["preview"] and method == "POST":
+                fn, data = fields["file"]
+                jpeg_bytes, info = svc.preset_preview(pid, fn, data, q.get("preset_id"))
+                self.send_response(200); self.send_header("Content-Type", "image/jpeg")
+                self.send_header("X-Preset-Name", info.get("preset") or ""); self.send_header("X-Scene", info.get("scene") or "")
+                self.send_header("Content-Length", str(len(jpeg_bytes))); self.end_headers(); self.wfile.write(jpeg_bytes); return
+        except PresetLimitReached as e:
+            return self._send(409, {"detail": str(e)})
+        except LookupError as e:
+            return self._send(404, {"detail": str(e)})
+        except (PresetError, ValueError) as e:
+            return self._send(422, {"detail": str(e)})
+        return self._send(404, {"detail": "no preset route"})
+
+    def _references(self, method, pid, rest, q, body):
+        """Reference album designs, served by the REAL data-service code (mirrors app/api.py)."""
+        svc = real_service()
+        from app.service import ReferenceLimitReached
+        try:
+            if rest == [] and method == "GET": return self._send(200, svc.album_references(pid))
+            if rest == [] and method == "POST":
+                files = [(fn, data) for name, fn, data in multipart(self.headers.get("Content-Type", ""), body) if name == "files"]
+                return self._send(200, svc.add_album_references(pid, files, int(q["limit"]) if "limit" in q else None))
+            if len(rest) == 1 and method == "DELETE": return self._send(200, svc.delete_album_reference(pid, rest[0]))
+            if len(rest) == 2 and rest[1] == "thumb": return self._send(200, svc.album_reference_thumb(pid, rest[0]), "image/jpeg")
+        except ReferenceLimitReached as e:
+            return self._send(409, {"detail": str(e)})
+        except LookupError as e:
+            return self._send(404, {"detail": str(e)})
+        except ValueError as e:
+            return self._send(422, {"detail": str(e)})
+        return self._send(404, {"detail": "no reference route"})
 
     def _album_setup(self, event_id, q):
         """Create the fb_data event with real photos and a submitted album selection (as the real flow would)."""
@@ -247,5 +303,6 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self): self._route("POST")
     def do_PUT(self): self._route("PUT")
     def do_DELETE(self): self._route("DELETE")
+    def do_PATCH(self): self._route("PATCH")
 
 ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1]) if len(sys.argv) > 1 else 8001), H).serve_forever()

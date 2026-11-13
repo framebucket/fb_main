@@ -94,7 +94,11 @@ async function requestMultipart(path, body) {
     try { payload = JSON.parse(responseText); } catch { payload = { detail: responseText }; }
   }
   if (!response.ok) {
-    throw new Error(payload?.detail || payload?.message || `The upload failed (HTTP ${response.status}).`);
+    const error = new Error(payload?.detail || payload?.message || `The upload failed (HTTP ${response.status}).`);
+    error.status = response.status;
+    error.code = payload?.code;
+    error.limit = payload?.limit;
+    throw error;
   }
   return payload;
 }
@@ -404,6 +408,16 @@ export const api = {
   setDomain: (domain) => request('/api/studio/brand/domain', { method: 'PUT', body: { domain } }),
   verifyDomain: () => request('/api/studio/brand/domain/verify', { method: 'POST' }),
   removeDomain: () => request('/api/studio/brand/domain', { method: 'DELETE' }),
+  editingPresets: () => request('/api/studio/editing-presets'),
+  uploadEditingPreset: (file, { name, scene } = {}) => { const form = new FormData(); form.append('file', file); if (name) form.append('name', name); form.append('scene', scene || 'any'); return requestMultipart('/api/studio/editing-presets', form); },
+  updateEditingPreset: (id, body) => request(`/api/studio/editing-presets/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
+  deleteEditingPreset: (id) => request(`/api/studio/editing-presets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  editingPresetSettings: (usePresets) => request('/api/studio/editing-presets/settings', { method: 'PUT', body: { usePresets } }),
+  previewEditingPreset: (file, presetId) => { const form = new FormData(); form.append('file', file); return requestMultipart(`/api/studio/editing-presets/preview${presetId ? `?presetId=${encodeURIComponent(presetId)}` : ''}`, form); },
+  albumReferences: () => request('/api/studio/album-references'),
+  uploadAlbumReferences: (files) => { const form = new FormData(); files.forEach((file) => form.append('files', file)); return requestMultipart('/api/studio/album-references', form); },
+  deleteAlbumReference: (id) => request(`/api/studio/album-references/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  albumReferenceThumbUrl: (id) => `${apiBase}/api/studio/album-references/${encodeURIComponent(id)}/thumb`,
   editingStyle: () => request('/api/studio/editing-style'),
   saveEditingStyle: (body) => request('/api/studio/editing-style', { method: 'PUT', body }),
   clearEditingStyle: () => request('/api/studio/editing-style', { method: 'DELETE' }),
@@ -450,6 +464,13 @@ export const api = {
   addEventCost: (eventId, body) => request(`/api/events/${encodeURIComponent(eventId)}/costs`, { method: 'POST', body }),
   deleteEventCost: (eventId, id) => request(`/api/events/${encodeURIComponent(eventId)}/costs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   insights: () => request('/api/studio/insights'),
+  requestLoginCode: (identifier) => request('/api/auth/login/request-code', { method: 'POST', body: { identifier } }),
+  verifyLoginCode: async (form) => {
+    const profile = await request('/api/auth/login/verify-code', { method: 'POST', body: form });
+    csrfToken = null;
+    await loadCsrfToken();
+    return profile;
+  },
   login: async (form) => {
     const profile = await request('/api/auth/login', { method: 'POST', body: form });
     csrfToken = null;

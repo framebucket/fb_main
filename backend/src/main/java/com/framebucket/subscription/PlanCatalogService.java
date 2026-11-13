@@ -101,13 +101,15 @@ public class PlanCatalogService {
             }
             features.add(feature.name());
         }
-        Limits limits = request.limits() == null ? new Limits(null, null, null, null, null) : request.limits();
+        Limits limits = request.limits() == null ? new Limits(null, null, null, null, null, null, null) : request.limits();
         Map<String, Object> limitMap = new LinkedHashMap<>();
         limitMap.put("customers", limits.customers());
         limitMap.put("upcomingEvents", limits.upcomingEvents());
         limitMap.put("teamMembers", limits.teamMembers());
         limitMap.put("storageGb", limits.storageGb());
         limitMap.put("whatsappMessagesPerMonth", limits.whatsappMessagesPerMonth());
+        limitMap.put("editingPresets", limits.editingPresets());
+        limitMap.put("albumReferences", limits.albumReferences());
         Map<String, Object> json = new LinkedHashMap<>();
         json.put("features", new ArrayList<>(features));
         json.put("limits", limitMap);

@@ -26,7 +26,7 @@ if [ -z "${BACKEND_CMD:-}" ]; then
   BACKEND_CMD="java -Duser.timezone=UTC -jar $JAR"
 fi
 
-if [ "$#" -gt 0 ]; then suites=("$@"); else suites=(e2e_suite e2e_admin e2e_growth e2e_style e2e_album e2e_invite); fi
+if [ "$#" -gt 0 ]; then suites=("$@"); else suites=(e2e_suite e2e_admin e2e_growth e2e_otp e2e_style e2e_presets e2e_refs e2e_album e2e_invite); fi
 
 failures=0
 summary=""

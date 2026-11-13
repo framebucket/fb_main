@@ -50,10 +50,15 @@ public class AuthService {
 
     @Transactional
     public UserResponse register(RegisterRequest request) {
-        if (!request.password().equals(request.confirmPassword())) {
+        String password = request.password();
+        if (password == null || password.isBlank()) {
+            // Passwordless account: sign-in is by WhatsApp code; this random secret is never shown or used.
+            byte[] random = new byte[24];
+            new java.security.SecureRandom().nextBytes(random);
+            password = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(random);
+        } else if (!password.equals(request.confirmPassword())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Passwords do not match.");
-        }
-        if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
+        } else if (password.getBytes(StandardCharsets.UTF_8).length > 72) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Password must be no more than 72 UTF-8 bytes."
@@ -78,14 +83,14 @@ public class AuthService {
                 request.studioName(),
                 email,
                 mobileNumber,
-                passwordEncoder.encode(request.password())
+                passwordEncoder.encode(password)
         );
         subIdService.initializeSubId(user);
         user.startFreeTrial(trialPlan);
 
         user = userRepository.save(user);
         emailVerificationService.sendVerificationEmail(user);
-        mobileVerificationService.sendCode(user);
+        // The WhatsApp sign-in code (sent by the controller) also verifies the mobile number.
         return toResponse(user);
     }
 

@@ -252,6 +252,106 @@ public class DataServiceClient {
         }
     }
 
+    // ---- editing presets (Lightroom .xmp/.lrtemplate, .cube LUTs); the service picks one per photo ----
+
+    public record PresetPreview(byte[] jpeg, String preset, String scene) {
+    }
+
+    public Map<String, Object> presets(UUID photographerId) {
+        return getJson(uri("/api/v1/studios/" + photographerId + "/presets"));
+    }
+
+    public Map<String, Object> uploadPreset(UUID photographerId, NamedBytes file, String name, String scene, Integer limit) {
+        URI target = limit == null ? uri("/api/v1/studios/" + photographerId + "/presets")
+                : query("/api/v1/studios/" + photographerId + "/presets", "limit", String.valueOf(limit));
+        return exchange(() -> {
+            MultiValueMap<String, Object> multipart = new LinkedMultiValueMap<>();
+            multipart.add("file", filePart("file", file));
+            if (name != null && !name.isBlank()) multipart.add("name", name.trim());
+            multipart.add("scene", scene == null || scene.isBlank() ? "any" : scene);
+            return restClient.post().uri(target).header(SERVICE_KEY_HEADER, token())
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(multipart).retrieve().body(JSON_MAP);
+        });
+    }
+
+    public Map<String, Object> updatePreset(UUID photographerId, String presetId, Map<String, Object> changes) {
+        return sendJson(uri("/api/v1/studios/" + photographerId + "/presets/" + safeId(presetId)), "PATCH", changes);
+    }
+
+    public Map<String, Object> deletePreset(UUID photographerId, String presetId) {
+        return sendJson(uri("/api/v1/studios/" + photographerId + "/presets/" + safeId(presetId)), "DELETE", Map.of());
+    }
+
+    public Map<String, Object> presetSettings(UUID photographerId, boolean usePresets) {
+        return putJson(uri("/api/v1/studios/" + photographerId + "/presets/settings"), Map.of("use_presets", usePresets));
+    }
+
+    public PresetPreview presetPreview(UUID photographerId, NamedBytes sample, String presetId) {
+        URI target = presetId == null || presetId.isBlank()
+                ? uri("/api/v1/studios/" + photographerId + "/presets/preview")
+                : query("/api/v1/studios/" + photographerId + "/presets/preview", "preset_id", safeId(presetId));
+        String serviceKey = token();
+        try {
+            MultiValueMap<String, Object> multipart = new LinkedMultiValueMap<>();
+            multipart.add("file", filePart("file", sample));
+            var entity = restClient.post().uri(target).header(SERVICE_KEY_HEADER, serviceKey)
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(multipart).retrieve().toEntity(byte[].class);
+            return new PresetPreview(entity.getBody(), entity.getHeaders().getFirst("X-Preset-Name"),
+                    entity.getHeaders().getFirst("X-Scene"));
+        } catch (RestClientResponseException exception) {
+            throw serviceError(exception.getStatusCode().value(), exception.getResponseBodyAsString());
+        } catch (RuntimeException exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "The Python data service is unavailable. Start it on " + baseUrl + ".", exception);
+        }
+    }
+
+    // ---- reference album designs (Studio and Business) ----
+
+    public Map<String, Object> albumReferences(UUID photographerId) {
+        return getJson(uri("/api/v1/studios/" + photographerId + "/album-references"));
+    }
+
+    public Map<String, Object> uploadAlbumReferences(UUID photographerId, List<NamedBytes> spreads, Integer limit) {
+        URI target = limit == null ? uri("/api/v1/studios/" + photographerId + "/album-references")
+                : query("/api/v1/studios/" + photographerId + "/album-references", "limit", String.valueOf(limit));
+        return exchange(() -> {
+            MultiValueMap<String, Object> multipart = new LinkedMultiValueMap<>();
+            for (NamedBytes spread : spreads) {
+                multipart.add("files", filePart("files", spread));
+            }
+            return restClient.post().uri(target).header(SERVICE_KEY_HEADER, token())
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(multipart).retrieve().body(JSON_MAP);
+        });
+    }
+
+    public Map<String, Object> deleteAlbumReference(UUID photographerId, String referenceId) {
+        return sendJson(uri("/api/v1/studios/" + photographerId + "/album-references/" + safeId(referenceId)), "DELETE", Map.of());
+    }
+
+    public byte[] albumReferenceThumb(UUID photographerId, String referenceId) {
+        URI target = uri("/api/v1/studios/" + photographerId + "/album-references/" + safeId(referenceId) + "/thumb");
+        String serviceKey = token();
+        try {
+            return restClient.get().uri(target).header(SERVICE_KEY_HEADER, serviceKey).retrieve().body(byte[].class);
+        } catch (RestClientResponseException exception) {
+            throw serviceError(exception.getStatusCode().value(), exception.getResponseBodyAsString());
+        } catch (RuntimeException exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "The Python data service is unavailable. Start it on " + baseUrl + ".", exception);
+        }
+    }
+
+    private static String safeId(String id) {
+        if (id == null || !id.matches("[A-Za-z0-9_-]{1,64}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid id.");
+        }
+        return id;
+    }
+
     private static HttpEntity<ByteArrayResource> filePart(String field, NamedBytes file) {
         ByteArrayResource resource = new ByteArrayResource(file.bytes()) {
             @Override

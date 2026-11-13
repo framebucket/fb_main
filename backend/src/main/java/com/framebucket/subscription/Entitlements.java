@@ -28,7 +28,9 @@ public record Entitlements(
             Integer upcomingEvents,
             Integer teamMembers,
             Integer storageGb,
-            Integer whatsappMessagesPerMonth
+            Integer whatsappMessagesPerMonth,
+            Integer editingPresets,
+            Integer albumReferences
     ) {
         public static Limits from(Map<String, Object> raw) {
             return new Limits(
@@ -36,7 +38,9 @@ public record Entitlements(
                     number(raw, "upcomingEvents"),
                     number(raw, "teamMembers"),
                     number(raw, "storageGb"),
-                    number(raw, "whatsappMessagesPerMonth"));
+                    number(raw, "whatsappMessagesPerMonth"),
+                    number(raw, "editingPresets"),
+                    number(raw, "albumReferences"));
         }
 
         private static Integer number(Map<String, Object> raw, String key) {

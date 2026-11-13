@@ -55,7 +55,7 @@ export function CrewTab({ eventId }) {
   return (
     <div className="growth-stack">
       {messages}
-      {!list.length ? <p className="customer-empty">No crew yet. Add team members and freelancers from your Team tab.</p> : (
+      {!list.length ? <p className="customer-empty">No crew yet. Add team members and freelancers under Crew → Members.</p> : (
         <div className="customer-table-scroll"><table className="customer-table growth-table">
           <thead><tr><th>Name</th><th>Role</th><th>Call time</th><th>Fee</th><th>Notes</th><th /></tr></thead>
           <tbody>{list.map((c) => editing?.id === c.id ? (
@@ -179,21 +179,39 @@ export function GearCostsTab({ eventId }) {
 // Dashboard tab: crew balances, payouts, availability, gear inventory
 // ---------------------------------------------------------------------------------------------
 
-export function CrewPanel({ user }) {
-  const [tab, setTab] = useState('payouts');
-  if (!hasFeature(user, 'CREW_PAYOUTS') && !hasFeature(user, 'GEAR_COSTS')) {
-    return <section className="event-module studio-panel"><UpgradeNotice feature="CREW_PAYOUTS" title="Crew & gear">Schedule your crew, see who's owed what, and keep a packing list for every shoot.</UpgradeNotice></section>;
-  }
+/**
+ * Crew: everyone who shoots with you (team members and freelancers), when they're unavailable and what
+ * they're owed. `members` is the team list (it lives with the invite flow).
+ */
+export function CrewPanel({ user, members, initialTab = 'members' }) {
+  const [tab, setTab] = useState(initialTab);
+  const crewTools = hasFeature(user, 'CREW_PAYOUTS');
   return (
     <section className="event-module studio-panel">
-      <PanelIntro eyebrow="Your people and kit" title="Crew &" accent="gear.">Who's owed what, who's unavailable when, and everything you own. Assign crew and pack gear per event from Events → Manage.</PanelIntro>
-      <div className="studio-subtabs">{[['payouts', 'Payouts'], ['availability', 'Availability'], ['gear', 'Gear']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>
-      {tab === 'payouts' && <PayoutsSection />}
-      {tab === 'availability' && <AvailabilitySection />}
-      {tab === 'gear' && <GearInventory />}
+      <PanelIntro eyebrow="Your people" title="Your" accent="crew.">Team members and freelancers in one place: invite them, see who's unavailable when, and who's owed what. Assign crew to a shoot from Events → Manage.</PanelIntro>
+      <div className="studio-subtabs">{[['members', 'Members'], ['availability', 'Availability'], ['payouts', 'Payouts']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>
+      {tab === 'members' && members}
+      {tab !== 'members' && !crewTools && <UpgradeNotice feature="CREW_PAYOUTS" title="Crew scheduling & payouts">Mark when people are unavailable, spot clashes and track what each person is owed.</UpgradeNotice>}
+      {tab === 'availability' && crewTools && <AvailabilitySection />}
+      {tab === 'payouts' && crewTools && <PayoutsSection />}
     </section>
   );
 }
+
+/** Gear: everything you own, with a packing checklist per shoot (Events → Manage → Gear & costs). */
+export function GearPanel({ user }) {
+  if (!hasFeature(user, 'GEAR_COSTS')) {
+    return <section className="event-module studio-panel"><UpgradeNotice feature="GEAR_COSTS" title="Gear & profit">Keep a list of your kit, pack it per shoot and see real profit per booking.</UpgradeNotice></section>;
+  }
+  return (
+    <section className="event-module studio-panel">
+      <PanelIntro eyebrow="Your kit" title="Your" accent="gear.">Everything you own. Pack it per shoot and log travel and other costs from Events → Manage → Gear &amp; costs.</PanelIntro>
+      <GearInventory />
+    </section>
+  );
+}
+
+export { AvailabilitySection, PayoutsSection };
 
 function PayoutsSection() {
   const balances = useLoad(() => api.crewBalances(), []);

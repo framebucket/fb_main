@@ -25,7 +25,7 @@ public class SmtpCustomerLoginOtpEmailSender implements CustomerLoginOtpEmailSen
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromAddress);
         message.setTo(recipient);
-        message.setSubject("Your FrameBucket customer sign-in code");
+        message.setSubject("Your FrameBucket sign-in code");
         message.setText("Your FrameBucket sign-in code is " + code
                 + ". It expires in 10 minutes. If you did not request this code, you can ignore this email.");
         mailSender.send(message);

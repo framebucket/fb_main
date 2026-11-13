@@ -41,7 +41,7 @@ public class CatalogAdminService {
         List<ItemView> items = catalog.items(photographerId, false).stream()
                 .map(i -> new ItemView(i.id(), i.code(), i.kind(), i.name(), i.description(), i.price(), i.active(), i.sortOrder()))
                 .toList();
-        return new CatalogResponse(settings.albumSheetPrice(), settings.discountPercent(), settings.advancePercent(),
+        return new CatalogResponse(settings.albumSheetPrice(), settings.albumSheetsPerEvent(), settings.discountPercent(), settings.advancePercent(),
                 settings.contractTerms(), settings.customTerms(),
                 items.stream().filter(i -> "SERVICE".equals(i.kind())).toList(),
                 items.stream().filter(i -> "ADDON".equals(i.kind())).toList(),
@@ -55,12 +55,15 @@ public class CatalogAdminService {
         String terms = request.contractTerms() == null || request.contractTerms().isBlank()
                 || request.contractTerms().strip().equals(QuotePricingService.DEFAULT_TERMS) ? null : request.contractTerms().strip();
         jdbc.update("""
-                        INSERT INTO fb_quote_settings (photographer_id, album_sheet_price, discount_percent, advance_percent, contract_terms)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO fb_quote_settings (photographer_id, album_sheet_price, album_sheets_per_event, discount_percent, advance_percent, contract_terms)
+                        VALUES (?, ?, ?, ?, ?, ?)
                         ON CONFLICT (photographer_id) DO UPDATE SET album_sheet_price = EXCLUDED.album_sheet_price,
+                            album_sheets_per_event = EXCLUDED.album_sheets_per_event,
                             discount_percent = EXCLUDED.discount_percent, advance_percent = EXCLUDED.advance_percent,
                             contract_terms = EXCLUDED.contract_terms, updated_at = CURRENT_TIMESTAMP
-                        """, photographerId, request.albumSheetPrice(), request.discountPercent(), request.advancePercent(), terms);
+                        """, photographerId, request.albumSheetPrice(),
+                request.albumSheetsPerEvent() == null ? QuotePricingService.DEFAULT_ALBUM_SHEETS_PER_EVENT : request.albumSheetsPerEvent(),
+                request.discountPercent(), request.advancePercent(), terms);
         return catalog(photographerId);
     }
 

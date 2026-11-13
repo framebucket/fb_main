@@ -162,7 +162,7 @@ function buildMenu() {
         { label: 'Customers', accelerator: 'CmdOrCtrl+4', click: go('/customers') },
         { label: 'Calendar', accelerator: 'CmdOrCtrl+5', click: go('/calendar') },
         { label: 'Payments', accelerator: 'CmdOrCtrl+6', click: go('/money') },
-        { label: 'Team', accelerator: 'CmdOrCtrl+7', click: go('/team') },
+        { label: 'Crew', accelerator: 'CmdOrCtrl+7', click: go('/team') },
         { type: 'separator' },
         { label: 'Studio settings', accelerator: 'CmdOrCtrl+,', click: go('/more/studio') },
         { type: 'separator' },
@@ -211,6 +211,12 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(() => {
+    // The server keeps the desktop app signed in until the app is updated; it recognises the app (and its
+    // version) from this user-agent token.
+    const appToken = `FrameBucket/${app.getVersion()}`;
+    if (!session.defaultSession.getUserAgent().includes(appToken)) {
+      session.defaultSession.setUserAgent(`${session.defaultSession.getUserAgent()} ${appToken}`);
+    }
     // Only FrameBucket's own pages may use the camera, notifications, clipboard or folder access
     // (live folder sync needs folder access).
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {

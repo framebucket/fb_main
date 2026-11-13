@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../../api.js';
 import { hasFeature, PlanUsageCard, PricingPlans, UpgradeNotice } from '../../Plans.jsx';
-import { CrewPanel } from '../../Crew.jsx';
+import { AvailabilitySection, GearPanel, PayoutsSection } from '../../Crew.jsx';
 import { InsightsPanel } from '../../Insights.jsx';
 import { ShowcasePanel, StudioSettingsPanel } from '../../Studio.jsx';
 import { LeadCaptureSettings, QuoteCatalogSettings } from '../../Bookings.jsx';
@@ -15,13 +15,13 @@ import { telLink, whatsappLink } from '../format.js';
 
 // Screens that reuse the website's panels inside the app frame (settings and less frequent tools).
 const SECTIONS = {
-  crew: { title: 'Crew & gear', render: (user) => <CrewPanel user={user} /> },
+  gear: { title: 'Gear', render: (user) => <GearPanel user={user} /> },
   insights: { title: 'Insights', render: (user) => (hasFeature(user, 'INSIGHTS') ? <InsightsPanel user={user} /> : <UpgradeNotice feature="INSIGHTS" title="Insights">See bookings, conversion and profit trends for your studio.</UpgradeNotice>) },
   portfolio: { title: 'Portfolio & e-albums', render: (user) => (hasFeature(user, 'PORTFOLIO') || hasFeature(user, 'E_ALBUM') ? <ShowcasePanel user={user} /> : <UpgradeNotice feature="PORTFOLIO" title="Portfolio & e-album flipbooks">Publish a public portfolio page and share page-turning e-albums with your clients.</UpgradeNotice>) },
   packages: { title: 'Packages & pricing', render: (user) => <QuoteCatalogSettings user={user} /> },
   leads: { title: 'Enquiry links', render: (user) => (hasFeature(user, 'LEAD_CAPTURE') ? <LeadCaptureSettings /> : <UpgradeNotice feature="LEAD_CAPTURE" title="Enquiry links">Get enquiries straight from Instagram, WhatsApp and your website.</UpgradeNotice>) },
   branding: { title: 'Branding & watermark', render: () => <BrandingSettings /> },
-  style: { title: 'Editing style & logo', render: () => <EditingStyleSettings /> },
+  style: { title: 'Presets, style & album designs', render: () => <EditingStyleSettings /> },
   studio: { title: 'Studio settings', render: () => <StudioSettingsPanel /> },
   plan: { title: 'Plan & usage', render: () => <><PlanUsageCard /><PricingPlans navigate={(destination) => { window.location.href = destination; }} /></> },
 };
@@ -46,8 +46,8 @@ export function MoreScreen() {
         <List>
           <Row icon="users" title="Customers" onClick={() => navigate('/customers')} />
           <Row icon="calendar" title="Calendar" onClick={() => navigate('/calendar')} />
-          <Row icon="team" title="Team" subtitle="Photographers and freelancers" onClick={() => navigate('/team')} />
-          <Row icon="box" title="Crew & gear" subtitle="Payouts, availability, kit" onClick={() => navigate('/more/crew')} />
+          <Row icon="team" title="Crew" subtitle="Team, freelancers, availability, payouts" onClick={() => navigate('/team')} />
+          <Row icon="box" title="Gear" subtitle="Your kit and packing lists" onClick={() => navigate('/more/gear')} />
           <Row icon="chart" title="Insights" onClick={() => navigate('/more/insights')} />
         </List>
       </Section>
@@ -58,7 +58,7 @@ export function MoreScreen() {
           <Row icon="link" title="Enquiry links" subtitle="For Instagram, WhatsApp and your website" onClick={() => navigate('/more/leads')} />
           <Row icon="book" title="Portfolio & e-albums" onClick={() => navigate('/more/portfolio')} />
           <Row icon="brush" title="Branding & watermark" onClick={() => navigate('/more/branding')} />
-          <Row icon="sparkle" title="Editing style & logo" onClick={() => navigate('/more/style')} />
+          <Row icon="sparkle" title="Presets & editing style" onClick={() => navigate('/more/style')} />
         </List>
       </Section>
 
@@ -99,6 +99,9 @@ const SKILLS = [['PHOTOGRAPHY', 'Photography'], ['VIDEOGRAPHY', 'Videography'], 
 const LANGUAGES = [['KANNADA', 'Kannada'], ['ENGLISH', 'English'], ['HINDI', 'Hindi'], ['TAMIL', 'Tamil'], ['TELUGU', 'Telugu'], ['MALAYALAM', 'Malayalam']];
 
 export function TeamScreen() {
+  const { user } = useUser();
+  const [section, setSection] = useState('members');
+  const embedClass = useEmbedClass();
   const team = useResource(() => api.teamMembers(), []);
   const [view, setView] = useState('TEAM_MEMBER');
   const [adding, setAdding] = useState(false);
@@ -112,10 +115,19 @@ export function TeamScreen() {
   }
 
   return (
-    <Screen back backTo="/more" title="Team" onRefresh={team.reload} fab={<Fab label="Add team member" onClick={() => setAdding(true)} />}>
+    <Screen back backTo="/more" title="Crew" onRefresh={team.reload} fab={section === 'members' ? <Fab label="Add crew member" onClick={() => setAdding(true)} /> : null}>
       <div className="m-sticky-tools">
-        <Segmented value={view} onChange={setView} options={[['TEAM_MEMBER', 'Team', (team.data || []).filter((m) => m.memberType === 'TEAM_MEMBER').length], ['FREELANCER', 'Freelancers', (team.data || []).filter((m) => m.memberType === 'FREELANCER').length]]} />
+        <Segmented value={section} onChange={setSection} options={[['members', 'Members'], ['availability', 'Availability'], ['payouts', 'Payouts']]} />
+        {section === 'members' && <Segmented value={view} onChange={setView} options={[['TEAM_MEMBER', 'Team', (team.data || []).filter((m) => m.memberType === 'TEAM_MEMBER').length], ['FREELANCER', 'Freelancers', (team.data || []).filter((m) => m.memberType === 'FREELANCER').length]]} />}
       </div>
+      {section !== 'members' && (
+        <div className={embedClass}>
+          {!hasFeature(user, 'CREW_PAYOUTS')
+            ? <UpgradeNotice feature="CREW_PAYOUTS" title="Crew scheduling & payouts">Mark when people are unavailable, spot clashes and track what each person is owed.</UpgradeNotice>
+            : section === 'availability' ? <AvailabilitySection /> : <PayoutsSection />}
+        </div>
+      )}
+      {section === 'members' && <>
       <ErrorNote message={team.error} onRetry={team.reload} />
       {!team.data ? <Skeleton /> : !list.length ? <Empty icon="team" title={view === 'FREELANCER' ? 'No freelancers yet' : 'No team members yet'} action={<Button onClick={() => setAdding(true)}>Add someone</Button>}>Send an invite link and they fill in their own profile.</Empty> : (
         <div className="m-list">
@@ -133,6 +145,7 @@ export function TeamScreen() {
           ))}
         </div>
       )}
+      </>}
       <AddMemberSheet open={adding} memberType={view} onClose={() => setAdding(false)} onSaved={(member) => team.setData((current) => [member, ...(current || [])])} />
     </Screen>
   );

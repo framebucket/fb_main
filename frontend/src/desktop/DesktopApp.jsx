@@ -29,10 +29,10 @@ const NAV = [
   ['/customers', 'Customers', 'users', '4'],
   ['/calendar', 'Calendar', 'clock', '5'],
   ['/money', 'Payments', 'wallet', '6'],
-  ['/team', 'Team', 'team', '7'],
+  ['/team', 'Crew', 'team', '7'],
 ];
 const NAV_STUDIO = [
-  ['/more/crew', 'Crew & gear', 'box'],
+  ['/more/gear', 'Gear', 'box'],
   ['/more/insights', 'Insights', 'chart'],
   ['/more/portfolio', 'Portfolio & e-albums', 'book'],
 ];
@@ -40,7 +40,7 @@ const NAV_SETTINGS = [
   ['/more/packages', 'Packages & pricing', 'tag'],
   ['/more/leads', 'Enquiry links', 'link'],
   ['/more/branding', 'Branding & watermark', 'brush'],
-  ['/more/style', 'Editing style & logo', 'sparkle'],
+  ['/more/style', 'Presets, style & album designs', 'sparkle'],
   ['/more/studio', 'Studio settings', 'settings'],
   ['/more/plan', 'Plan & usage', 'crown'],
 ];
@@ -290,7 +290,7 @@ function Shell({ user, setUser }) {
   }, []);
 
   useEffect(() => {
-    const titles = { home: 'Home', events: 'Events', enquiries: 'Enquiries', customers: 'Customers', calendar: 'Calendar', money: 'Payments', team: 'Team', more: 'Settings' };
+    const titles = { home: 'Home', events: 'Events', enquiries: 'Enquiries', customers: 'Customers', calendar: 'Calendar', money: 'Payments', team: 'Crew', more: 'Settings' };
     document.title = `${titles[route.parts[0]] || 'FrameBucket'} · FrameBucket`;
   }, [route.parts]);
 

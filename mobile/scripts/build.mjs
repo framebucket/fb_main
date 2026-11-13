@@ -67,6 +67,8 @@ function applyUrlOverride(nativeConfigFile) {
     json.server = { ...json.server, url: appUrl };
     const host = new URL(appUrl).host;
     json.server.allowNavigation = Array.from(new Set([host, ...(json.server.allowNavigation || [])]));
+    // The server keeps app users signed in until the app is updated; it reads the version from this token.
+    json.appendUserAgent = `FrameBucketApp/${version}`;
     return JSON.stringify(json, null, 2);
   });
 }

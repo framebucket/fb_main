@@ -8,7 +8,7 @@ import AdminApp from './Admin.jsx';
 import { EnquireFormPage, EnquiryBookingCell, LeadCaptureSettings, QuoteCatalogSettings, QuoteContractSection, QuotePackagePicker, StudioMark, brandStyle, useEnquiryTracking } from './Bookings.jsx';
 import { BrandingSettings, CustomerDeliveryModal, EditingStyleSettings, EventWorkspaceModal } from './Delivery.jsx';
 import { InvitationModal } from './Invitation.jsx';
-import { CrewPanel } from './Crew.jsx';
+import { CrewPanel, GearPanel } from './Crew.jsx';
 import { InsightsPanel } from './Insights.jsx';
 import { BillingPanel, CalendarPanel, CustomerBillingModal, FlipbookPage, PublicPortfolioPage, ShowcasePanel, StudioSettingsPanel, useCustomerDownloadPolicy } from './Studio.jsx';
 
@@ -147,7 +147,7 @@ export default function App() {
     return (
       <RegisterPage
         navigate={navigate}
-        onRegistered={(email) => setNotice(`Account created for ${email}. Verify your email and mobile number before signing in. In local mode, the mobile code appears in the backend console.`)}
+        onLogin={(profile) => { setUser(profile); setCustomerProfile(null); }}
       />
     );
   }
@@ -238,7 +238,7 @@ function GrowthSettings({ user }) {
   return (
     <section className="event-module studio-panel">
       <div className="customer-module-intro"><p className="eyebrow">Win more bookings · look premium</p><h2>Bookings &amp; <em>brand.</em></h2><p>Your packages and prices, enquiry links for Instagram, WhatsApp and your website, your logo, colours, watermark and domain, and the editing look applied to every photo you upload.</p></div>
-      <div className="studio-subtabs">{[['packages', 'Packages & pricing'], ['leads', 'Enquiry links'], ['brand', 'Branding & watermark'], ['style', 'Editing style & logo']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>
+      <div className="studio-subtabs">{[['packages', 'Packages & pricing'], ['leads', 'Enquiry links'], ['brand', 'Branding & watermark'], ['style', 'Presets, style & album designs']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>
       {tab === 'packages' && <QuoteCatalogSettings user={user} />}
       {tab === 'leads' && (hasFeature(user, 'LEAD_CAPTURE') ? <LeadCaptureSettings /> : <UpgradeNotice feature="LEAD_CAPTURE" title="Enquiry links">Get enquiries straight from Instagram, WhatsApp and your website.</UpgradeNotice>)}
       {tab === 'brand' && <BrandingSettings />}
@@ -406,10 +406,41 @@ function PaymentPage({ navigate }) {
   );
 }
 
-function RegisterPage({ navigate, onRegistered }) {
-  const [form, setForm] = useState({ fullName: '', studioName: '', email: '', mobileNumber: '', password: '', confirmPassword: '' });
+const MOBILE_PATTERN = /^(?:[0-9]{10}|\+91[0-9]{10})$/;
+
+/** Six-digit WhatsApp code entry shared by sign-in and sign-up. */
+function CodeEntry({ sentTo, message, code, setCode, busy, onResend, onBack, backLabel, submitLabel }) {
+  const [wait, setWait] = useState(60);
+  useEffect(() => {
+    if (wait <= 0) return undefined;
+    const timer = window.setTimeout(() => setWait((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [wait]);
+  return (
+    <>
+      <div className="otp-sent" role="status">
+        <span className="otp-sent-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.66 15l-1.3 4.76 4.88-1.28A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.18-1.15l-.3-.18-2.9.76.78-2.83-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.14c-.25-.12-1.46-.72-1.69-.8-.23-.08-.39-.12-.56.12-.16.25-.64.8-.78.97-.15.16-.29.18-.54.06a6.7 6.7 0 0 1-3.32-2.9c-.25-.43.25-.4.72-1.33.08-.16.04-.3-.02-.43l-.76-1.83c-.2-.48-.4-.41-.56-.42h-.47a.9.9 0 0 0-.66.31 2.77 2.77 0 0 0-.86 2.06 4.8 4.8 0 0 0 1 2.56 11 11 0 0 0 4.2 3.7c1.56.68 2.18.73 2.96.62.48-.07 1.46-.6 1.67-1.18.2-.58.2-1.07.15-1.18-.06-.1-.22-.16-.47-.28Z"/></svg>
+        </span>
+        <span><strong>Check WhatsApp{sentTo ? ` on ${sentTo}` : ''}</strong><small>{message || 'We sent a 6-digit code. A copy is in your email too.'}</small></span>
+      </div>
+      <label>6-digit code<input className="otp-input" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength="6" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} required placeholder="••••••" autoFocus /></label>
+      <button className="button button-dark button-full" type="submit" disabled={busy || code.length !== 6}>{busy ? 'Checking…' : submitLabel}</button>
+      <div className="verification-help otp-actions">
+        <button type="button" disabled={busy || wait > 0} onClick={() => { setWait(60); onResend(); }}>{wait > 0 ? `Resend code in ${wait}s` : 'Resend code'}</button>
+        <button type="button" onClick={onBack}>{backLabel}</button>
+      </div>
+    </>
+  );
+}
+
+function RegisterPage({ navigate, onLogin }) {
+  const [form, setForm] = useState({ fullName: '', studioName: '', email: '', mobileNumber: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [code, setCode] = useState('');
+  const [message, setMessage] = useState('');
 
   function update(event) {
     setForm({ ...form, [event.target.name]: event.target.value });
@@ -418,15 +449,10 @@ function RegisterPage({ navigate, onRegistered }) {
   async function submit(event) {
     event.preventDefault();
     setError('');
-    if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
     setBusy(true);
     try {
       await api.register(form);
-      onRegistered(form.email.trim());
-      navigate('/login');
+      setCodeSent(true);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -434,21 +460,52 @@ function RegisterPage({ navigate, onRegistered }) {
     }
   }
 
+  async function verify(event) {
+    event.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      const profile = await api.verifyLoginCode({ identifier: form.email.trim(), code });
+      onLogin(profile);
+      navigate('/dashboard');
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resend() {
+    setError('');
+    try {
+      const response = await api.requestLoginCode(form.email.trim());
+      setMessage(response.message);
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
   return (
-    <AuthLayout eyebrow="A good place to begin" title={<>Make room for<br /><em>the work you love.</em></>} subtitle="Create your photographer account and set up your studio workspace.">
-      <form className="auth-form" onSubmit={submit}>
-        <label>Full name<input name="fullName" value={form.fullName} onChange={update} autoComplete="name" required maxLength="120" placeholder="Your name" /></label>
-        <label>Studio name <span className="optional-label">Optional</span><input name="studioName" value={form.studioName} onChange={update} maxLength="160" placeholder="The name clients know" /></label>
-        <label>Email address<input name="email" type="email" value={form.email} onChange={update} autoComplete="email" required maxLength="320" placeholder="you@yourstudio.com" /></label>
-        <label>Mobile number<input name="mobileNumber" type="tel" value={form.mobileNumber} onChange={update} autoComplete="tel" required maxLength="13" pattern="([0-9]{10}|\+91[0-9]{10})" placeholder="9876543210" aria-describedby="mobile-format-hint" /><span id="mobile-format-hint" className="field-hint">Enter 10 digits. You may also include +91.</span></label>
-        <label>Password<input name="password" type="password" value={form.password} onChange={update} autoComplete="new-password" required minLength="12" maxLength="64" placeholder="At least 12 characters" /></label>
-        <label>Confirm password<input name="confirmPassword" type="password" value={form.confirmPassword} onChange={update} autoComplete="new-password" required minLength="12" maxLength="64" placeholder="Enter the same password again" /></label>
-        {error && <p className="form-error" role="alert">{error}</p>}
-        <button className="button button-dark button-full" type="submit" disabled={busy}>
-          {busy ? 'Creating your account…' : 'Create photographer account'}
-        </button>
-        <p className="form-footnote">We’ll send a verification link to your email and a one-time code to your mobile. Your password is stored as a one-way hash.</p>
-      </form>
+    <AuthLayout eyebrow="A good place to begin" title={<>Make room for<br /><em>the work you love.</em></>} subtitle={codeSent ? 'One last step: confirm your WhatsApp number.' : 'Create your photographer account and set up your studio workspace. No password to remember.'}>
+      {codeSent ? (
+        <form className="auth-form" onSubmit={verify}>
+          <CodeEntry sentTo={form.mobileNumber.trim()} message={message} code={code} setCode={setCode} busy={busy} onResend={resend}
+            onBack={() => { setCodeSent(false); setCode(''); setError(''); navigate('/login'); }} backLabel="Sign in instead" submitLabel="Confirm and open my studio" />
+          {error && <p className="form-error" role="alert">{error}</p>}
+        </form>
+      ) : (
+        <form className="auth-form" onSubmit={submit}>
+          <label>Full name<input name="fullName" value={form.fullName} onChange={update} autoComplete="name" required maxLength="120" placeholder="Your name" /></label>
+          <label>Studio name <span className="optional-label">Optional</span><input name="studioName" value={form.studioName} onChange={update} maxLength="160" placeholder="The name clients know" /></label>
+          <label>WhatsApp mobile number<input name="mobileNumber" type="tel" value={form.mobileNumber} onChange={update} autoComplete="tel" required maxLength="13" pattern="([0-9]{10}|\+91[0-9]{10})" placeholder="9876543210" aria-describedby="mobile-format-hint" /><span id="mobile-format-hint" className="field-hint">We send your sign-in codes here on WhatsApp.</span></label>
+          <label>Email address<input name="email" type="email" value={form.email} onChange={update} autoComplete="email" required maxLength="320" placeholder="you@yourstudio.com" /></label>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button className="button button-dark button-full" type="submit" disabled={busy}>
+            {busy ? 'Creating your account…' : 'Create account and get code'}
+          </button>
+          <p className="form-footnote">No password needed. You sign in with a one-time code on WhatsApp, and we email a copy.</p>
+        </form>
+      )}
       <p className="auth-switch">Already registered? <button onClick={() => navigate('/login')}>Log in</button></p>
     </AuthLayout>
   );
@@ -456,16 +513,13 @@ function RegisterPage({ navigate, onRegistered }) {
 
 function LoginPage({ navigate, notice, clearNotice, onLogin, onCustomerLogin }) {
   const [accountType, setAccountType] = useState('photographer');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [identifier, setIdentifier] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
+  const [code, setCode] = useState('');
+  const [sentTo, setSentTo] = useState('');
+  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [resending, setResending] = useState(false);
-  const [resendNotice, setResendNotice] = useState('');
-  const [needsMobileVerification, setNeedsMobileVerification] = useState(false);
-  const [mobileCode, setMobileCode] = useState('');
-  const [mobileBusy, setMobileBusy] = useState(false);
-  const [mobileNotice, setMobileNotice] = useState('');
   const [customerMobile, setCustomerMobile] = useState('');
   const [customerCodeSent, setCustomerCodeSent] = useState(false);
   const [customerCode, setCustomerCode] = useState('');
@@ -475,86 +529,44 @@ function LoginPage({ navigate, notice, clearNotice, onLogin, onCustomerLogin }) 
   function chooseAccountType(type) {
     setAccountType(type);
     setError('');
-    setNeedsMobileVerification(false);
     setCustomerNotice('');
   }
 
-  async function resendVerification() {
+  async function requestCode(event) {
+    event?.preventDefault();
     setError('');
-    setResendNotice('');
-    if (!username.trim()) {
-      setError('Enter your email address above first.');
+    const value = identifier.trim();
+    if (!value.includes('@') && !MOBILE_PATTERN.test(value)) {
+      setError('Enter your registered mobile number (10 digits) or email address.');
       return;
     }
-    if (!username.includes('@')) {
-      setError('Enter your email address above to resend the verification link.');
-      return;
-    }
-
-    setResending(true);
-    try {
-      const response = await api.resendVerification(username.trim());
-      setResendNotice(response.message);
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setResending(false);
-    }
-  }
-
-  async function submit(event) {
-    event.preventDefault();
-    setError('');
     setBusy(true);
     try {
-      const profile = await api.login({ username, password });
-      onLogin(profile);
-      navigate('/dashboard');
-      clearNotice();
+      const response = await api.requestLoginCode(value);
+      setSentTo(response.sentTo || '');
+      setMessage(response.message);
+      setCode('');
+      setCodeSent(true);
     } catch (requestError) {
       setError(requestError.message);
-      if (/verify your mobile/i.test(requestError.message)) {
-        setNeedsMobileVerification(true);
-      }
     } finally {
       setBusy(false);
     }
   }
 
-  async function verifyMobile(event) {
+  async function verifyCode(event) {
     event.preventDefault();
     setError('');
-    setMobileNotice('');
-    setMobileBusy(true);
+    setBusy(true);
     try {
-      const response = await api.verifyMobile(username.trim(), mobileCode);
-      setNeedsMobileVerification(false);
-      setMobileCode('');
-      setMobileNotice(response.message);
+      const profile = await api.verifyLoginCode({ identifier: identifier.trim(), code });
+      onLogin(profile);
+      navigate('/dashboard');
+      clearNotice();
     } catch (requestError) {
       setError(requestError.message);
     } finally {
-      setMobileBusy(false);
-    }
-  }
-
-  async function resendMobileCode() {
-    setError('');
-    setMobileNotice('');
-    const identifier = username.trim();
-    const isMobileNumber = /^(?:[0-9]{10}|\+91[0-9]{10})$/.test(identifier);
-    if (!identifier || (!identifier.includes('@') && !isMobileNumber)) {
-      setError('Enter your email address or mobile number above to resend the verification code.');
-      return;
-    }
-    setMobileBusy(true);
-    try {
-      const response = await api.resendMobileCode(identifier);
-      setMobileNotice(response.message);
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setMobileBusy(false);
+      setBusy(false);
     }
   }
 
@@ -596,7 +608,7 @@ function LoginPage({ navigate, notice, clearNotice, onLogin, onCustomerLogin }) 
   }
 
   return (
-    <AuthLayout eyebrow="Welcome back" title={accountType === 'photographer' ? <>Pick up right<br /><em>where you left off.</em></> : <>Your memories<br /><em>are close by.</em></>} subtitle={accountType === 'photographer' ? 'Sign in to see what is happening across your studio.' : 'Sign in to view the events you have booked with your photographer.'}>
+    <AuthLayout eyebrow="Welcome back" title={accountType === 'photographer' ? <>Pick up right<br /><em>where you left off.</em></> : <>Your memories<br /><em>are close by.</em></>} subtitle={accountType === 'photographer' ? 'Sign in with a one-time code on WhatsApp. No password needed.' : 'Sign in to view the events you have booked with your photographer.'}>
       <div className="login-account-types" role="tablist" aria-label="Choose account type">
         <button type="button" role="tab" aria-selected={accountType === 'photographer'} className={accountType === 'photographer' ? 'login-account-type active' : 'login-account-type'} onClick={() => chooseAccountType('photographer')}>Photographer</button>
         <button type="button" role="tab" aria-selected={accountType === 'customer'} className={accountType === 'customer' ? 'login-account-type active' : 'login-account-type'} onClick={() => chooseAccountType('customer')}>Customer</button>
@@ -604,40 +616,28 @@ function LoginPage({ navigate, notice, clearNotice, onLogin, onCustomerLogin }) 
       {accountType === 'photographer' ? (
         <>
           {notice && <p className="form-success" role="status">{notice}</p>}
-          <form className="auth-form" onSubmit={submit}>
-            <label>Email or mobile number<input type="text" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required maxLength="320" placeholder="you@yourstudio.com or 9876543210" /></label>
-            <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required placeholder="Your password" /></label>
+          <form className="auth-form" onSubmit={codeSent ? verifyCode : requestCode}>
+            {codeSent ? (
+              <CodeEntry sentTo={sentTo} message={message} code={code} setCode={setCode} busy={busy} onResend={() => requestCode()}
+                onBack={() => { setCodeSent(false); setCode(''); setError(''); }} backLabel="Use another number" submitLabel="Sign in to your studio" />
+            ) : (
+              <>
+                <label>WhatsApp number or email<input type="text" value={identifier} onChange={(event) => setIdentifier(event.target.value)} autoComplete="username" required maxLength="320" placeholder="9876543210 or you@yourstudio.com" autoFocus /></label>
+                <button className="button button-dark button-full" type="submit" disabled={busy}>
+                  {busy ? 'Sending code…' : 'Send code on WhatsApp'}
+                </button>
+              </>
+            )}
             {error && <p className="form-error" role="alert">{error}</p>}
-            <button className="button button-dark button-full" type="submit" disabled={busy}>
-              {busy ? 'Signing in…' : 'Sign in to your studio'}
-            </button>
           </form>
-          <div className="verification-help">
-            <span>Didn’t receive a verification email?</span>
-            <button type="button" onClick={resendVerification} disabled={resending}>
-              {resending ? 'Sending…' : 'Send a new link'}
-            </button>
-          </div>
-          {resendNotice && <p className="form-success" role="status">{resendNotice}</p>}
-          {needsMobileVerification && (
-            <form className="auth-form mobile-verification-form" onSubmit={verifyMobile}>
-              <p className="verification-prompt">Enter the 6-digit code sent to your mobile number. In local mode, find it in the backend console.</p>
-              <label>Mobile verification code<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength="6" value={mobileCode} onChange={(event) => setMobileCode(event.target.value.replace(/\D/g, '').slice(0, 6))} required placeholder="000000" /></label>
-              <button className="button button-dark button-full" type="submit" disabled={mobileBusy || mobileCode.length !== 6}>
-                {mobileBusy ? 'Verifying…' : 'Verify mobile number'}
-              </button>
-              <div className="verification-help"><span>Code expired or missing?</span><button type="button" onClick={resendMobileCode} disabled={mobileBusy}>{mobileBusy ? 'Sending…' : 'Send a new code'}</button></div>
-            </form>
-          )}
-          {mobileNotice && <p className="form-success" role="status">{mobileNotice}</p>}
         </>
       ) : (
         <form className="auth-form customer-login-form" onSubmit={customerCodeSent ? verifyCustomerCode : requestCustomerCode}>
           {customerCodeSent ? (
             <>
-              <p className="form-success" role="status">{customerNotice || 'Check your registered email and mobile for the same one-time code.'}</p>
+              <p className="form-success" role="status">{customerNotice || 'Check WhatsApp for your sign-in code. A copy is in your email too.'}</p>
               <label>Registered mobile number<input type="tel" value={customerMobile} readOnly /></label>
-              <label>One-time code<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength="6" value={customerCode} onChange={(event) => setCustomerCode(event.target.value.replace(/\D/g, '').slice(0, 6))} required placeholder="000000" /></label>
+              <label>One-time code<input className="otp-input" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength="6" value={customerCode} onChange={(event) => setCustomerCode(event.target.value.replace(/\D/g, '').slice(0, 6))} required placeholder="••••••" /></label>
               {error && <p className="form-error" role="alert">{error}</p>}
               <button className="button button-dark button-full" type="submit" disabled={customerBusy || customerCode.length !== 6}>
                 {customerBusy ? 'Verifying…' : 'Verify code and continue'}
@@ -649,11 +649,11 @@ function LoginPage({ navigate, notice, clearNotice, onLogin, onCustomerLogin }) 
             </>
           ) : (
             <>
-              <p className="verification-prompt">Enter your registered mobile number. We’ll send the same sign-in code to the email and mobile number on file.</p>
+              <p className="verification-prompt">Enter the mobile number your photographer has on file. We’ll send a sign-in code on WhatsApp.</p>
               <label>Mobile number<input type="tel" value={customerMobile} onChange={(event) => setCustomerMobile(event.target.value)} autoComplete="tel" required maxLength="13" pattern="([0-9]{10}|\+91[0-9]{10})" placeholder="9876543210" /></label>
               {error && <p className="form-error" role="alert">{error}</p>}
               <button className="button button-dark button-full" type="submit" disabled={customerBusy}>
-                {customerBusy ? 'Sending code…' : 'Send sign-in code'}
+                {customerBusy ? 'Sending code…' : 'Send code on WhatsApp'}
               </button>
             </>
           )}
@@ -1022,10 +1022,10 @@ function Dashboard({ user, onLogout }) {
           Events
         </button>
         <button className={activeTab === 'team' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('team')} aria-pressed={activeTab === 'team'}>
-          Team
+          Crew
         </button>
-        <button className={activeTab === 'crew' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('crew')} aria-pressed={activeTab === 'crew'}>
-          Crew &amp; gear
+        <button className={activeTab === 'gear' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('gear')} aria-pressed={activeTab === 'gear'}>
+          Gear
         </button>
         <button className={activeTab === 'calendar' ? 'module-tab active' : 'module-tab'} onClick={() => setActiveTab('calendar')} aria-pressed={activeTab === 'calendar'}>
           Calendar
@@ -1053,7 +1053,7 @@ function Dashboard({ user, onLogout }) {
       </nav>
       <p className="workflow-sequence">Photography workflow <b>Enquiries</b><span>→</span><b>Contract</b><span>→</span><b>Events</b><span>→</span><b>Crew</b><span>→</span><b>Delivery</b></p>
       <div className="module-stage" key={activeTab}>
-        {activeTab === 'overview' ? <DashboardOverview user={user} /> : activeTab === 'enquiries' ? <EnquiryPanel user={user} /> : activeTab === 'customers' ? <CustomerPanel user={user} /> : activeTab === 'events' ? <EventPanel user={user} onOpenGallery={(event) => { setDataEventId(event.id); setActiveTab('data'); }} /> : activeTab === 'team' ? <TeamPanel user={user} /> : activeTab === 'crew' ? <CrewPanel user={user} /> : activeTab === 'insights' ? <InsightsPanel user={user} /> : activeTab === 'calendar' ? <CalendarPanel user={user} /> : activeTab === 'billing' ? (hasFeature(user, 'BILLING') ? <BillingPanel user={user} /> : <UpgradeNotice feature="BILLING" title="Payments, receipts & expenses">Record client payments, share UPI payment QR codes, send GST receipts and track studio expenses.</UpgradeNotice>) : activeTab === 'showcase' ? (hasFeature(user, 'PORTFOLIO') || hasFeature(user, 'E_ALBUM') ? <ShowcasePanel user={user} /> : <UpgradeNotice feature="PORTFOLIO" title="Portfolio & e-album flipbooks">Publish a public portfolio page and share page-turning e-albums with your clients.</UpgradeNotice>) : activeTab === 'settings' ? <><StudioSettingsPanel /><GrowthSettings user={user} /></> : dataModuleEnabled ? <DataPanel initialEventId={dataEventId} /> : <UpgradeNotice feature="GALLERY" title="Online galleries">Deliver photos online with client selection and downloads.</UpgradeNotice>}
+        {activeTab === 'overview' ? <DashboardOverview user={user} /> : activeTab === 'enquiries' ? <EnquiryPanel user={user} /> : activeTab === 'customers' ? <CustomerPanel user={user} /> : activeTab === 'events' ? <EventPanel user={user} onOpenGallery={(event) => { setDataEventId(event.id); setActiveTab('data'); }} /> : activeTab === 'team' || activeTab === 'crew' ? <CrewPanel user={user} members={<TeamPanel user={user} embedded />} /> : activeTab === 'gear' ? <GearPanel user={user} /> : activeTab === 'insights' ? <InsightsPanel user={user} /> : activeTab === 'calendar' ? <CalendarPanel user={user} /> : activeTab === 'billing' ? (hasFeature(user, 'BILLING') ? <BillingPanel user={user} /> : <UpgradeNotice feature="BILLING" title="Payments, receipts & expenses">Record client payments, share UPI payment QR codes, send GST receipts and track studio expenses.</UpgradeNotice>) : activeTab === 'showcase' ? (hasFeature(user, 'PORTFOLIO') || hasFeature(user, 'E_ALBUM') ? <ShowcasePanel user={user} /> : <UpgradeNotice feature="PORTFOLIO" title="Portfolio & e-album flipbooks">Publish a public portfolio page and share page-turning e-albums with your clients.</UpgradeNotice>) : activeTab === 'settings' ? <><StudioSettingsPanel /><GrowthSettings user={user} /></> : dataModuleEnabled ? <DataPanel initialEventId={dataEventId} /> : <UpgradeNotice feature="GALLERY" title="Online galleries">Deliver photos online with client selection and downloads.</UpgradeNotice>}
       </div>
       <footer className="dashboard-footer"><Brand /><span>Your growth counts.</span><span>© 2026 FrameBucket</span></footer>
     </main>
@@ -1615,7 +1615,7 @@ const teamSkills = [
   ['PHOTO_EDITING', 'Photo editing'], ['VIDEO_EDITING', 'Video Editing'], ['ALBUM_DESIGNING', 'Album designing'],
 ];
 
-function TeamPanel({ user }) {
+function TeamPanel({ user, embedded = false }) {
   const [activeView, setActiveView] = useState('list');
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1690,14 +1690,14 @@ function TeamPanel({ user }) {
 
   return (
     <section className="customer-module team-module">
-      <div className="customer-module-intro">
+      <div className="customer-module-intro" hidden={embedded}>
         <p className="eyebrow">The people behind your studio</p>
         <h2>Build your <em>team.</em></h2>
         <p>Keep your crew’s contact details, languages, and skills together. Send a secure link so each person can complete their own profile.</p>
       </div>
       <nav className="customer-subtabs" aria-label="Team options">
-        <button className={activeView === 'list' ? 'customer-subtab active' : 'customer-subtab'} onClick={() => { setActiveView('list'); setError(''); }} aria-pressed={activeView === 'list'}>Team List</button>
-        <button className={activeView === 'create' ? 'customer-subtab active' : 'customer-subtab'} onClick={() => { setActiveView('create'); setError(''); setNotice(''); setInvitation(null); }} aria-pressed={activeView === 'create'}>Create team member</button>
+        <button className={activeView === 'list' ? 'customer-subtab active' : 'customer-subtab'} onClick={() => { setActiveView('list'); setError(''); }} aria-pressed={activeView === 'list'}>Crew list</button>
+        <button className={activeView === 'create' ? 'customer-subtab active' : 'customer-subtab'} onClick={() => { setActiveView('create'); setError(''); setNotice(''); setInvitation(null); }} aria-pressed={activeView === 'create'}>Add crew member</button>
       </nav>
       {error && <p className="form-error customer-message" role="alert">{error}</p>}
       {notice && activeView === 'list' && <p className="form-success customer-message" role="status">{notice}</p>}
@@ -2330,7 +2330,7 @@ function QuotationBuilderPage({ token }) {
   const [context, setContext] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ venue: '', eventDate: '', preferredTime: 'Morning', events: [], albumSheets: 0, packageId: null, addonIds: [] });
+  const [form, setForm] = useState({ venue: '', eventDate: '', preferredTime: 'Morning', events: [], album: false, packageId: null, addonIds: [] });
   const [finalPrice, setFinalPrice] = useState(null);
   const [pricingBusy, setPricingBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -2370,7 +2370,7 @@ function QuotationBuilderPage({ token }) {
         eventDate: form.eventDate || null,
         preferredTime: form.preferredTime,
         events: form.events,
-        albumSheets: Number(form.albumSheets) || 0,
+        album: Boolean(form.album),
         packageId: form.packageId || null,
         addonIds: form.addonIds || [],
       })
@@ -2411,7 +2411,7 @@ function QuotationBuilderPage({ token }) {
         eventDate: form.eventDate || null,
         preferredTime: form.preferredTime,
         events: form.events,
-        albumSheets: Number(form.albumSheets) || 0,
+        album: Boolean(form.album),
         packageId: form.packageId || null,
         addonIds: form.addonIds || [],
       });
@@ -2494,7 +2494,14 @@ function QuotationBuilderPage({ token }) {
               <QuotePackagePicker context={context} form={form} setForm={setForm} />
               <section className="quote-card">
                 <div className="quote-card-heading"><div><h2>Make it an album</h2><p>Add a printed album to preserve your favourite memories.</p></div><span>Optional</span></div>
-                <div className="quote-album-row"><div><b>Premium photo album</b><p>Each sheet includes an average of 4–6 photos.</p></div><label>Number of sheets<input type="number" min="0" max="500" step="1" value={form.albumSheets} onChange={(event) => setForm((current) => ({ ...current, albumSheets: event.target.value }))} /></label></div>
+                <label className={form.album ? 'quote-album-choice selected' : 'quote-album-choice'}>
+                  <input type="checkbox" checked={Boolean(form.album)} onChange={(event) => setForm((current) => ({ ...current, album: event.target.checked }))} />
+                  <span className="quote-album-check" aria-hidden="true">{form.album ? '✓' : ''}</span>
+                  <span>
+                    <b>Yes, include a premium photo album</b>
+                    <small>{context.albumSheetsPerEvent || 30} sheets for {form.events.length > 1 ? `each of your ${form.events.length} events` : 'your event'}, about 4–6 photos per sheet. Designed after you select your photos.</small>
+                  </span>
+                </label>
               </section>
               <section className="quote-card">
                 <div className="quote-card-heading"><div><h2>Check dates &amp; plan your booking</h2><p>Tell the studio your preferred date and time.</p></div><span>Next step</span></div>

@@ -65,9 +65,15 @@ public class QuotePricingService {
                                  boolean highlighted, boolean active, int sortOrder) {
     }
 
-    public record Settings(BigDecimal albumSheetPrice, BigDecimal discountPercent, BigDecimal advancePercent,
-                           String contractTerms, boolean customTerms) {
+    /**
+     * Album pricing: customers only tick "Album"; each event then includes {@code albumSheetsPerEvent} sheets at
+     * {@code albumSheetPrice} (default 30 × ₹400 = ₹12,000 per event). The per-sheet price is never shown to customers.
+     */
+    public record Settings(BigDecimal albumSheetPrice, int albumSheetsPerEvent, BigDecimal discountPercent,
+                           BigDecimal advancePercent, String contractTerms, boolean customTerms) {
     }
+
+    public static final int DEFAULT_ALBUM_SHEETS_PER_EVENT = 30;
 
     static final RowMapper<CatalogItem> ITEM = (rs, n) -> new CatalogItem(rs.getObject("id", UUID.class),
             rs.getString("code"), rs.getString("kind"), rs.getString("name"), rs.getString("description"),
@@ -105,10 +111,18 @@ public class QuotePricingService {
         return jdbc.query("SELECT * FROM fb_quote_settings WHERE photographer_id = ?", (rs, n) -> {
                     String terms = rs.getString("contract_terms");
                     boolean custom = terms != null && !terms.isBlank();
-                    return new Settings(rs.getBigDecimal("album_sheet_price"), rs.getBigDecimal("discount_percent"),
-                            rs.getBigDecimal("advance_percent"), custom ? terms : DEFAULT_TERMS, custom);
+                    return new Settings(rs.getBigDecimal("album_sheet_price"), rs.getInt("album_sheets_per_event"),
+                            rs.getBigDecimal("discount_percent"), rs.getBigDecimal("advance_percent"),
+                            custom ? terms : DEFAULT_TERMS, custom);
                 }, photographerId).stream().findFirst()
-                .orElse(new Settings(new BigDecimal("400.00"), new BigDecimal("5.00"), new BigDecimal("30.00"), DEFAULT_TERMS, false));
+                .orElse(new Settings(new BigDecimal("400.00"), DEFAULT_ALBUM_SHEETS_PER_EVENT, new BigDecimal("5.00"),
+                        new BigDecimal("30.00"), DEFAULT_TERMS, false));
+    }
+
+    /** Album sheets for a quote: the studio's sheets-per-event for every event, if the customer wants an album. */
+    public int albumSheets(UUID photographerId, QuoteSubmissionRequest request) {
+        if (!request.wantsAlbum()) return 0;
+        return settings(photographerId).albumSheetsPerEvent() * Math.max(1, request.events().size());
     }
 
     public List<QuoteServiceOption> serviceOptions(UUID photographerId) {
@@ -153,7 +167,7 @@ public class QuotePricingService {
             subtotal = subtotal.add(packageById(photographerId, request.packageId(), true).price());
         }
         Settings settings = settings(photographerId);
-        subtotal = subtotal.add(settings.albumSheetPrice().multiply(BigDecimal.valueOf(request.albumSheets())));
+        subtotal = subtotal.add(settings.albumSheetPrice().multiply(BigDecimal.valueOf(albumSheets(photographerId, request))));
         BigDecimal discount = subtotal.multiply(settings.discountPercent())
                 .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
         BigDecimal total = subtotal.subtract(discount).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);

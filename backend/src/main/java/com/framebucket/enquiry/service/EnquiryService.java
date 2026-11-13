@@ -350,7 +350,7 @@ public class EnquiryService {
                         quotation.getPreferredEventDate(),
                         quotation.getPreferredTime(),
                         selections,
-                        quotation.getAlbumSheets(), null, null
+                        quotation.getAlbumSheets(), null, null, null
                 ),
                 enquiry.getPhotographer().getId()
         );
@@ -360,7 +360,7 @@ public class EnquiryService {
                         quotation.getPreferredEventDate(),
                         quotation.getPreferredTime(),
                         selections,
-                        quotation.getAlbumSheets(), null, null
+                        quotation.getAlbumSheets(), null, null, null
                 ),
                 selectedEventTypes,
                 enquiry.getPhotographer().getId()
@@ -402,6 +402,7 @@ public class EnquiryService {
                 quotation == null ? null : quotation.getFinalPrice(),
                 pricingService.addonOptions(photographer.getId()),
                 pricingService.packageOptions(photographer.getId()),
+                pricingService.settings(photographer.getId()).albumSheetsPerEvent(),
                 quotation == null ? null : bookingHooks.quotationExtras(enquiry.getId()).packageName(),
                 quotation == null ? List.of() : pricingService.addonNames(photographer.getId(),
                         bookingHooks.quotationExtras(enquiry.getId()).addonCodes()),
@@ -432,6 +433,7 @@ public class EnquiryService {
         String packageName = request.packageId() == null ? null
                 : pricingService.packageById(photographerId, request.packageId(), true).name();
         List<String> addonCodes = QuotePricingService.addonCodes(request);
+        int albumSheets = pricingService.albumSheets(photographerId, request);
         List<QuotationPdfGenerator.EventSummary> summaries = withExtras(
                 buildEventSummaries(request, eventTypes, photographerId), photographerId, packageName, addonCodes);
         String quoteNumber = "Q-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT);
@@ -446,7 +448,7 @@ public class EnquiryService {
                 request.eventDate() == null ? null : request.eventDate().toString(),
                 request.preferredTime(),
                 summaries,
-                request.albumSheets(),
+                albumSheets,
                 finalPrice
         );
         String selectionsJson;
@@ -468,7 +470,7 @@ public class EnquiryService {
                 request.preferredTime(),
                 request.events().size(),
                 selectionsJson,
-                request.albumSheets(),
+                albumSheets,
                 finalPrice,
                 pdf
         ));

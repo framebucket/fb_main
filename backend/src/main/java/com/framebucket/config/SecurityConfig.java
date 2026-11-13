@@ -53,9 +53,16 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             SecurityContextRepository securityContextRepository,
-            CookieCsrfTokenRepository csrfTokenRepository
+            CookieCsrfTokenRepository csrfTokenRepository,
+            com.framebucket.user.auth.login.DeviceSessionService deviceSessionService,
+            com.framebucket.user.auth.login.PhotographerLoginCodeService photographerLoginCodeService,
+            com.framebucket.customer.service.CustomerLoginService customerLoginService
     ) throws Exception {
         http
+                // App users stay signed in until they update the app or sign out (see DeviceSessionService).
+                .addFilterAfter(new com.framebucket.user.auth.login.DeviceSessionFilter(deviceSessionService,
+                                photographerLoginCodeService, customerLoginService, securityContextRepository),
+                        org.springframework.security.web.context.SecurityContextHolderFilter.class)
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
@@ -122,6 +129,8 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/api/auth/register",
                                 "/api/auth/login",
+                                "/api/auth/login/request-code",
+                                "/api/auth/login/verify-code",
                                 "/api/auth/verify-email",
                                 "/api/auth/resend-verification",
                                 "/api/auth/verify-mobile",
@@ -148,6 +157,8 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(logout -> logout
                         .logoutUrl("/api/auth/logout")
+                        .addLogoutHandler((request, response, authentication) ->
+                                deviceSessionService.forget(request, response))
                         .logoutSuccessHandler((request, response, authentication) ->
                                 response.setStatus(HttpServletResponse.SC_NO_CONTENT))
                         .deleteCookies("JSESSIONID")

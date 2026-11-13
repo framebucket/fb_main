@@ -117,6 +117,7 @@ public final class EnquiryDtos {
             BigDecimal submittedFinalPrice,
             List<QuoteServiceOption> addons,
             List<QuotePackageOption> packages,
+            int albumSheetsPerEvent,
             String submittedPackageName,
             List<String> submittedAddonNames,
             Object contract,
@@ -137,8 +138,13 @@ public final class EnquiryDtos {
             @NotEmpty @Size(max = 8) List<@Valid QuoteEventRequest> events,
             @Min(0) @Max(500) int albumSheets,
             UUID packageId,
-            @Size(max = 20) List<@NotBlank @Size(max = 80) String> addonIds
+            @Size(max = 20) List<@NotBlank @Size(max = 80) String> addonIds,
+            Boolean album
     ) {
+        /** The customer ticked "Album". Older quote pages sent a sheet count instead. */
+        public boolean wantsAlbum() {
+            return Boolean.TRUE.equals(album) || albumSheets > 0;
+        }
     }
 
     public record QuoteCalculationResponse(BigDecimal finalPrice) {

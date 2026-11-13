@@ -53,7 +53,7 @@ section("Packages & add-ons per studio")
 cat = expect("catalogue (seeded)", p.get("/api/studio/quote-catalog"), 200).json()
 check("9 services + 3 add-ons seeded with old codes", len(cat["services"]) == 9 and len(cat["addons"]) == 3
       and {s["code"] for s in cat["services"]} >= {"photo", "candid", "drone"}, cat)
-check("defaults: ₹400/sheet, 5% discount, 30% advance", float(cat["albumSheetPrice"]) == 400 and float(cat["discountPercent"]) == 5
+check("defaults: ₹400/sheet x 30 sheets, 5% discount, 30% advance", float(cat["albumSheetPrice"]) == 400 and cat["albumSheetsPerEvent"] == 30 and float(cat["discountPercent"]) == 5
       and float(cat["advancePercent"]) == 30 and not cat["customTerms"], cat)
 cat = expect("add package", p.post("/api/studio/quote-catalog/packages", {"name": "Gold Wedding", "description": "Two-day wedding coverage",
        "inclusions": ["Candid photography", "Cinematic film", "40-sheet album"], "price": 150000, "highlighted": True, "active": True, "sortOrder": 10}), 200).json()
@@ -125,6 +125,22 @@ check(f"price = (package+candid+addons+sheets) - 10% = {expected}", float(calc["
 bad = dict(qform, events=[{"eventTypeId": wedding["id"], "serviceIds": ["led"]}])
 expect("switched-off service rejected", qc.post(f"/api/public/enquiries/quote/{lead_token}/calculate", bad), 400)
 expect("unknown package rejected", qc.post(f"/api/public/enquiries/quote/{lead_token}/calculate", dict(qform, packageId=gold["id"][:-4] + "0000")), 400)
+# Album is a tick box now: each event adds the studio's sheets-per-event at its (hidden) per-sheet price.
+check("customer sees sheets per event, never the per-sheet price", ctx.get("albumSheetsPerEvent") == 30 and "albumSheetPrice" not in ctx, ctx)
+two = {"venue": "", "eventDate": D(60), "preferredTime": "Evening", "album": True,
+       "events": [{"eventTypeId": wedding["id"], "serviceIds": ["photo"]}, {"eventTypeId": wedding["id"], "serviceIds": ["photo"]}]}
+calc2 = expect("calculate with album ticked, 2 events", qc.post(f"/api/public/enquiries/quote/{lead_token}/calculate", two), 200).json()
+check("album = 2 events x 30 sheets x 500", float(calc2["finalPrice"]) == round((2 * 7000 + 2 * 30 * 500) * 0.9), calc2)
+calc0 = qc.post(f"/api/public/enquiries/quote/{lead_token}/calculate", dict(two, album=False)).json()
+check("no album when unticked", float(calc0["finalPrice"]) == round(2 * 7000 * 0.9), calc0)
+cat = expect("sheets per event setting", p.put("/api/studio/quote-catalog/settings", {"albumSheetPrice": 500, "albumSheetsPerEvent": 25, "discountPercent": 10,
+       "advancePercent": 25, "contractTerms": "1. Advance is non-refundable.\n2. Balance due on the event day."}), 200).json()
+check("sheets per event saved", cat["albumSheetsPerEvent"] == 25, cat)
+calc3 = qc.post(f"/api/public/enquiries/quote/{lead_token}/calculate", dict(two, events=two["events"][:1])).json()
+check("album uses the new sheets per event (25 x 500)", float(calc3["finalPrice"]) == round((7000 + 25 * 500) * 0.9), calc3)
+expect("sheets per event out of range rejected", p.put("/api/studio/quote-catalog/settings", {"albumSheetPrice": 500, "albumSheetsPerEvent": 0, "discountPercent": 10, "advancePercent": 25}), 400)
+p.put("/api/studio/quote-catalog/settings", {"albumSheetPrice": 500, "albumSheetsPerEvent": 30, "discountPercent": 10,
+       "advancePercent": 25, "contractTerms": "1. Advance is non-refundable.\n2. Balance due on the event day."})
 expect("submit quote (CSRF ok for real browser flow)", Client().post(f"/api/public/enquiries/quote/{lead_token}/submit", qform), (200, 201))
 pdf = anon.get(B + f"/api/public/enquiries/quote/{lead_token}/pdf").content
 check("quote PDF lists package + add-ons", b"Gold Wedding" in pdf and b"Drone reel" in pdf, pdf[:200])

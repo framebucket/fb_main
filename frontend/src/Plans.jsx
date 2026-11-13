@@ -24,6 +24,8 @@ export const LIMIT_LABELS = [
   ['teamMembers', 'Team members'],
   ['storageGb', 'Photo storage'],
   ['whatsappMessagesPerMonth', 'WhatsApp messages / month'],
+  ['editingPresets', 'Editing presets'],
+  ['albumReferences', 'Reference album designs'],
 ];
 
 export function inrPlain(amount) {
@@ -66,10 +68,13 @@ function cheapestPlanWith(plans, feature) {
 }
 
 /** Shown instead of a module the photographer's plan doesn't include. */
-export function UpgradeNotice({ feature, title, children }) {
+export function UpgradeNotice({ feature, limitKey, title, children }) {
   const [plans, setPlans] = useState([]);
   useEffect(() => { loadPublicPlans().then(setPlans).catch(() => {}); }, []);
-  const plan = cheapestPlanWith(plans, feature);
+  const plan = limitKey
+    ? plans.filter((item) => Number(item.monthlyPrice) > 0 && item.limits?.[limitKey] !== 0)
+      .sort((a, b) => Number(a.monthlyPrice) - Number(b.monthlyPrice))[0]
+    : cheapestPlanWith(plans, feature);
   return (
     <section className="upgrade-notice">
       <div className="upgrade-notice-icon" aria-hidden="true">✦</div>
@@ -216,6 +221,8 @@ const COMPARE_LIMITS = [
   ['upcomingEvents', 'Upcoming events'],
   ['teamMembers', 'Team members'],
   ['whatsappMessagesPerMonth', 'WhatsApp messages / month'],
+  ['editingPresets', 'Editing presets (AI picks per photo)'],
+  ['albumReferences', 'Reference album designs'],
 ];
 
 function LimitValue({ name, value }) {

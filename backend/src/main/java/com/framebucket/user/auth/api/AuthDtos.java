@@ -18,9 +18,25 @@ public final class AuthDtos {
             @Size(max = 160) String studioName,
             @NotBlank @Email @Size(max = 320) String email,
             @NotBlank @Pattern(regexp = "^(?:[0-9]{10}|\\+91[0-9]{10})$") @Size(max = 13) String mobileNumber,
-            @NotBlank @Size(min = 12, max = 64) String password,
-            @NotBlank @Size(min = 12, max = 64) String confirmPassword
+            // Optional: sign-in is by WhatsApp code. Kept for API clients that still set one.
+            @Size(min = 12, max = 64) String password,
+            @Size(min = 12, max = 64) String confirmPassword
     ) {
+    }
+
+    /** Ask for a sign-in code. The identifier is the registered mobile number or email. */
+    public record LoginCodeRequest(
+            @NotBlank @Size(max = 320) @JsonAlias({"email", "mobileNumber", "username"}) String identifier
+    ) {
+    }
+
+    public record LoginCodeVerifyRequest(
+            @NotBlank @Size(max = 320) @JsonAlias({"email", "mobileNumber", "username"}) String identifier,
+            @NotBlank @Pattern(regexp = "^[0-9]{6}$") String code
+    ) {
+    }
+
+    public record LoginCodeResponse(String message, String sentTo) {
     }
 
     public record LoginRequest(

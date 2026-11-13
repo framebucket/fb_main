@@ -88,7 +88,7 @@ public class EntitlementService {
             return new Entitlements(subscribed == null ? FREE_PLAN : subscribed.code(),
                     subscribed == null ? "Free" : subscribed.name(), subscribed == null ? null : subscribed.code(),
                     SubscriptionStatus.SUSPENDED, trialEndsAt, planExpiresAt, billingCycle,
-                    Collections.emptySet(), new Limits(0, 0, 0, 0, 0));
+                    Collections.emptySet(), new Limits(0, 0, 0, 0, 0, 0, 0));
         }
 
         SubscriptionStatus status;
@@ -169,6 +169,16 @@ public class EntitlementService {
             throw PlanRestrictionException.limitReached("teamMembers",
                     "Your plan allows " + max + (max == 1 ? " team member" : " team members") + ". Upgrade your plan to add more.");
         }
+    }
+
+    /** How many editing presets the plan allows (null = unlimited). */
+    public Integer editingPresetLimit(UUID photographerId) {
+        return forPhotographer(photographerId).limits().editingPresets();
+    }
+
+    /** How many reference album designs the plan allows (null = unlimited, 0 = not included). */
+    public Integer albumReferenceLimit(UUID photographerId) {
+        return forPhotographer(photographerId).limits().albumReferences();
     }
 
     public void requireStorageFor(UUID photographerId, long additionalBytes) {
@@ -255,7 +265,8 @@ public class EntitlementService {
                 .stream().findFirst()
                 .orElse(new PlanRow(FREE_PLAN, "Free", 0, Map.of(
                         "features", List.of("CRM", "QUOTATIONS", "TEAM", "GALLERY"),
-                        "limits", Map.of("customers", 25, "upcomingEvents", 3, "teamMembers", 1, "storageGb", 5))));
+                        "limits", Map.of("customers", 25, "upcomingEvents", 3, "teamMembers", 1, "storageGb", 5,
+                                "editingPresets", 3, "albumReferences", 0))));
     }
 
     Map<String, Object> parse(String json) {

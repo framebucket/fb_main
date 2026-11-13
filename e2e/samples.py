@@ -65,3 +65,55 @@ def logo_png() -> bytes:
     buffer = io.BytesIO()
     image.save(buffer, "PNG")
     return buffer.getvalue()
+
+
+# ---- editing presets and reference album designs ----
+
+XMP_PRESET = b"""<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+<rdf:Description rdf:about="" xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+ crs:IncrementalTemperature="+18" crs:IncrementalTint="+4" crs:Exposure2012="+0.35" crs:Contrast2012="-12"
+ crs:Highlights2012="-40" crs:Shadows2012="+30" crs:Clarity2012="+10" crs:Vibrance="+12" crs:Saturation="-6"
+ crs:SplitToningShadowHue="210" crs:SplitToningShadowSaturation="12" crs:SplitToningHighlightHue="40" crs:SplitToningHighlightSaturation="18">
+ <crs:Name><rdf:Alt><rdf:li xml:lang="x-default">Golden Hour Bride</rdf:li></rdf:Alt></crs:Name>
+ <crs:ToneCurvePV2012><rdf:Seq><rdf:li>0, 22</rdf:li><rdf:li>64, 60</rdf:li><rdf:li>192, 200</rdf:li><rdf:li>255, 250</rdf:li></rdf:Seq></crs:ToneCurvePV2012>
+</rdf:Description></rdf:RDF></x:xmpmeta>"""
+
+LRTEMPLATE_PRESET = b"""s = { title = "Moody Film", value = { settings = { Exposure2012 = -0.3, Contrast2012 = 25, Blacks2012 = 12,
+ IncrementalTemperature = -10, Saturation = -25, ToneCurvePV2012 = { 0, 30, 128, 120, 255, 235, }, }, }, version = 0, }"""
+
+
+def cube_preset(size: int = 17) -> bytes:
+    """A teal-and-orange 3D LUT in .cube format (red changes fastest)."""
+    lines = ['TITLE "Teal Orange"', f"LUT_3D_SIZE {size}"]
+    axis = [i / (size - 1) for i in range(size)]
+    for b in axis:
+        for g in axis:
+            for r in axis:
+                lum = 0.3 * r + 0.6 * g + 0.1 * b
+                lines.append(f"{min(1, r * 1.05 + 0.02):.6f} {g:.6f} {max(0, b * 0.9 + 0.05 * (1 - lum)):.6f}")
+    return "\n".join(lines).encode()
+
+
+def spread(boxes, seed: int = 0, size=(2400, 1200), background=(246, 238, 220), frame: int = 8) -> bytes:
+    """A finished album spread: photos (with white frames) at the given normalised boxes on a cream page."""
+    rng = random.Random(seed)
+    image = Image.new("RGB", size, background)
+    draw = ImageDraw.Draw(image)
+    for index, (x, y, w, h) in enumerate(boxes):
+        px = [int(v) for v in (x * size[0], y * size[1], w * size[0], h * size[1])]
+        if frame:
+            draw.rectangle([px[0] - frame, px[1] - frame, px[0] + px[2] + frame, px[1] + px[3] + frame], fill=(255, 255, 255))
+        image.paste(photo(seed * 10 + index, (px[2], px[3])), (px[0], px[1]))
+    return jpeg(image, 90)
+
+
+SPREAD_LAYOUTS = [
+    [(0.04, 0.06, 0.42, 0.88), (0.54, 0.06, 0.20, 0.42), (0.76, 0.06, 0.20, 0.42), (0.54, 0.52, 0.42, 0.42)],
+    [(0.05, 0.08, 0.40, 0.84), (0.55, 0.08, 0.40, 0.84)],
+    [(0.03, 0.05, 0.30, 0.90), (0.36, 0.05, 0.30, 0.90), (0.69, 0.05, 0.28, 0.90)],
+    [(0.04, 0.06, 0.20, 0.40), (0.26, 0.06, 0.20, 0.40), (0.04, 0.54, 0.42, 0.40), (0.54, 0.06, 0.42, 0.88)],
+    [(0.0, 0.0, 1.0, 1.0)],
+    [(0.06, 0.1, 0.38, 0.8), (0.56, 0.1, 0.18, 0.36), (0.76, 0.1, 0.18, 0.36), (0.56, 0.54, 0.18, 0.36), (0.76, 0.54, 0.18, 0.36)],
+    [(0.08, 0.15, 0.35, 0.7), (0.57, 0.15, 0.35, 0.7)],
+    [(0.04, 0.06, 0.92, 0.42), (0.04, 0.52, 0.45, 0.42), (0.51, 0.52, 0.45, 0.42)],
+]

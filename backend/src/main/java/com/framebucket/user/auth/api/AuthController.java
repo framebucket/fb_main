@@ -44,6 +44,10 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository securityContextRepository;
     private final CsrfTokenRepository csrfTokenRepository;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.user.auth.login.PhotographerLoginCodeService loginCodes;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.framebucket.user.auth.login.DeviceSessionService deviceSessions;
     private final SecurityContextHolderStrategy contextHolderStrategy =
             SecurityContextHolder.getContextHolderStrategy();
 
@@ -67,7 +71,56 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
+        UserResponse created = authService.register(request);
+        // Straight to the WhatsApp code: entering it signs the new photographer in and verifies the number.
+        loginCodes.requestCode(created.email());
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PostMapping("/login/request-code")
+    public AuthDtos.LoginCodeResponse requestLoginCode(@Valid @RequestBody AuthDtos.LoginCodeRequest request) {
+        var result = loginCodes.requestCode(request.identifier());
+        return switch (result.result()) {
+            case NOT_FOUND -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "We couldn't find a FrameBucket account with that mobile number or email.");
+            case COOLDOWN -> new AuthDtos.LoginCodeResponse(
+                    "A code was sent a moment ago. Enter it, or wait 60 seconds to get a new one.", result.maskedMobile());
+            case SENT -> new AuthDtos.LoginCodeResponse(
+                    "We sent a 6-digit code to your WhatsApp (and a copy to your email).", result.maskedMobile());
+        };
+    }
+
+    @PostMapping("/login/verify-code")
+    public UserResponse verifyLoginCode(
+            @Valid @RequestBody AuthDtos.LoginCodeVerifyRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse
+    ) {
+        PhotographerPrincipal principal = loginCodes.verifyPrincipal(request.identifier(), request.code()).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "That code is wrong or has expired. Check WhatsApp or request a new code."));
+        if (!principal.isEnabled()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This account has been deactivated. Contact FrameBucket support.");
+        }
+        Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(
+                principal, null, principal.getAuthorities());
+        startSession(authentication, httpRequest, httpResponse);
+        deviceSessions.remember(httpRequest, httpResponse,
+                com.framebucket.user.auth.login.DeviceSessionService.Kind.PHOTOGRAPHER, principal.getId(), null);
+        jdbcTemplate.update("UPDATE fb_user SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?", principal.getId());
+        return authService.toResponse(principal);
+    }
+
+    private void startSession(Authentication authentication, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        var existingSession = httpRequest.getSession(false);
+        if (existingSession != null) {
+            existingSession.invalidate();
+        }
+        csrfTokenRepository.saveToken(null, httpRequest, httpResponse);
+        SecurityContext context = contextHolderStrategy.createEmptyContext();
+        context.setAuthentication(authentication);
+        contextHolderStrategy.setContext(context);
+        securityContextRepository.saveContext(context, httpRequest, httpResponse);
     }
 
     @PostMapping("/verify-email")
@@ -84,7 +137,9 @@ public class AuthController {
 
     @PostMapping("/verify-mobile")
     public Map<String, String> verifyMobile(@Valid @RequestBody VerifyMobileRequest request) {
-        if (!authService.verifyMobile(request.identifier(), request.code())) {
+        // Accounts now get one WhatsApp sign-in code at sign-up; it verifies the number here too.
+        if (!authService.verifyMobile(request.identifier(), request.code())
+                && loginCodes.verify(request.identifier(), request.code()).isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "The mobile verification code is invalid or expired. Request a new code and try again."
