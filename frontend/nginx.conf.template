@@ -37,6 +37,11 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
+    # Phone interface used by the Android/iOS apps.
+    location = /app {
+        try_files /app.html =404;
+    }
+
     # Client-side routes (/dashboard, /quote/..., /flipbook/...) all load the React app.
     location / {
         try_files $uri /index.html;

@@ -5,7 +5,7 @@
   "backgroundColor": "#1c1a17",
   "appendUserAgent": "FrameBucketApp",
   "server": {
-    "url": "https://fbmain-production.up.railway.app",
+    "url": "https://fbmain-production.up.railway.app/app",
     "cleartext": false,
     "errorPath": "offline.html",
     "allowNavigation": [

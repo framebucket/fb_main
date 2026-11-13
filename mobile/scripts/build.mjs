@@ -13,7 +13,7 @@
 // The android/ and ios/ folders are generated here and are not committed: every change to the app
 // lives in capacitor.config.json, resources/, www/ or this script, so a fresh checkout always rebuilds the same app.
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -35,7 +35,9 @@ function versionToCode(v) {
 
 function run(command, args, options = {}) {
   console.log(`\n> ${command} ${args.join(' ')}`);
-  const result = spawnSync(command, args, { stdio: 'inherit', shell: isWindows, cwd: root, ...options });
+  // On Windows the command goes through cmd.exe, so arguments with spaces must be quoted.
+  const finalArgs = isWindows ? args.map((arg) => (/[\s"&|<>^]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg)) : args;
+  const result = spawnSync(command, finalArgs, { stdio: 'inherit', shell: isWindows, cwd: root, ...options });
   if (result.status !== 0) {
     console.error(`\nFailed: ${command} ${args.join(' ')}`);
     process.exit(result.status || 1);
@@ -117,10 +119,92 @@ function prepare(platform) {
   else patchIos();
 }
 
+// Gradle needs the Android SDK path. Use ANDROID_HOME / ANDROID_SDK_ROOT, else Android Studio's default folder,
+// and write it to android/local.properties so a fresh PowerShell window is not required.
+function ensureAndroidSdk() {
+  const candidates = [
+    process.env.ANDROID_HOME,
+    process.env.ANDROID_SDK_ROOT,
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Android', 'Sdk'),
+    process.env.HOME && path.join(process.env.HOME, 'Library', 'Android', 'sdk'),
+    process.env.HOME && path.join(process.env.HOME, 'Android', 'Sdk'),
+  ].filter(Boolean);
+  const sdk = candidates.find((dir) => existsSync(path.join(dir, 'platform-tools')) || existsSync(path.join(dir, 'platforms')));
+  if (!sdk) {
+    fail('Android SDK not found. Open Android Studio > More Actions > SDK Manager, note the "Android SDK Location", '
+      + 'install an Android SDK Platform there, then set ANDROID_HOME to that folder (see README).\nLooked in:\n  '
+      + candidates.join('\n  '));
+  }
+  const escaped = sdk.replace(/\\/g, '\\\\').replace(/:/g, '\\:');
+  writeFileSync(path.join(root, 'android', 'local.properties'), `sdk.dir=${escaped}\n`);
+  console.log(`Android SDK: ${sdk}`);
+}
+
+// Capacitor 7 needs Java 21. Use JAVA_HOME if it is 21+, else the JDK bundled with Android Studio (jbr).
+function javaMajor(home) {
+  try {
+    const release = readFileSync(path.join(home, 'release'), 'utf8');
+    const match = /JAVA_VERSION="(\d+)/.exec(release);
+    return match ? Number(match[1]) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function listDirs(parent) {
+  try {
+    return readdirSync(parent, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => path.join(parent, d.name));
+  } catch {
+    return [];
+  }
+}
+
+// The Android build asks Gradle for exactly Java 21 (a newer JDK such as 23 does not count), so look for a 21
+// in the usual places: JAVA_HOME, Android Studio's bundled jbr, and installed JDKs (Oracle, Temurin, Microsoft, Zulu…).
+function findJdk() {
+  const programFiles = [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs')].filter(Boolean);
+  const vendorDirs = ['Java', 'Eclipse Adoptium', 'Microsoft', 'Zulu', 'Amazon Corretto', 'BellSoft', 'OpenJDK'];
+  const candidates = [
+    process.env.FB_JAVA_HOME,
+    process.env.JAVA_HOME,
+    ...programFiles.map((dir) => path.join(dir, 'Android', 'Android Studio', 'jbr')),
+    ...programFiles.map((dir) => path.join(dir, 'Android Studio', 'jbr')),
+    ...programFiles.flatMap((dir) => vendorDirs.flatMap((vendor) => listDirs(path.join(dir, vendor)))),
+    process.env.USERPROFILE && path.join(process.env.USERPROFILE, '.jdks'),
+    ...(process.env.USERPROFILE ? listDirs(path.join(process.env.USERPROFILE, '.jdks')) : []),
+    '/Applications/Android Studio.app/Contents/jbr/Contents/Home',
+    ...listDirs('/Library/Java/JavaVirtualMachines').map((dir) => path.join(dir, 'Contents', 'Home')),
+    process.env.HOME && path.join(process.env.HOME, 'android-studio', 'jbr'),
+    '/opt/android-studio/jbr',
+  ].filter(Boolean);
+  const seen = new Set();
+  const found = [];
+  for (const home of candidates) {
+    const key = path.resolve(home).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const major = javaMajor(home);
+    if (major) found.push({ home, major });
+  }
+  const jdk = found.find((entry) => entry.major === 21);
+  if (!jdk) {
+    fail('Java 21 not found (the Android build needs exactly 21; newer versions such as 23 are not accepted).\n'
+      + 'Install "Eclipse Temurin 21 (JDK)" from https://adoptium.net/temurin/releases/?version=21 '
+      + '(Windows x64 .msi), then run the build again. Or set FB_JAVA_HOME to a JDK 21 folder.\nJDKs found:\n  '
+      + (found.length ? found.map((entry) => `${entry.home} (Java ${entry.major})`).join('\n  ') : '(none)'));
+  }
+  console.log(`Java ${jdk.major}: ${jdk.home}`);
+  return jdk.home;
+}
+
 function gradle(task, extraArgs = []) {
+  ensureAndroidSdk();
   const androidDir = path.join(root, 'android');
   const wrapper = isWindows ? 'gradlew.bat' : './gradlew';
-  run(wrapper, [task, '--no-daemon', ...extraArgs], { cwd: androidDir });
+  const jdk = findJdk();
+  const env = { ...process.env, JAVA_HOME: jdk, PATH: `${path.join(jdk, 'bin')}${path.delimiter}${process.env.PATH || ''}` };
+  run(wrapper, [task, '--no-daemon', `-Dorg.gradle.java.installations.paths=${jdk}`,
+    '-Dorg.gradle.java.installations.auto-download=false', ...extraArgs], { cwd: androidDir, env });
 }
 
 function signingArgs() {

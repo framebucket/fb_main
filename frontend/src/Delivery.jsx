@@ -53,7 +53,7 @@ export function EventWorkspaceModal({ event, user, onClose }) {
   );
 }
 
-function DeliveryTab({ eventId }) {
+export function DeliveryTab({ eventId }) {
   const steps = useLoad(() => api.deliverySteps(eventId), [eventId]);
   const [list, setList] = useState(null);
   const [newStep, setNewStep] = useState({ title: '', kind: 'OTHER', dueDate: '' });
@@ -114,7 +114,7 @@ function FilmPlayer({ film, src }) {
   return <a className="button button-quiet button-small" href={film.externalUrl} target="_blank" rel="noreferrer">Watch {film.title} ↗</a>;
 }
 
-function FilmsTab({ eventId, user }) {
+export function FilmsTab({ eventId, user }) {
   const films = useLoad(() => api.films(eventId), [eventId]);
   const videos = useLoad(() => api.filmVideos(eventId).catch(() => []), [eventId]);
   const [list, setList] = useState(null);
@@ -283,7 +283,7 @@ function AutoDesignPanel({ eventId, user, onSent }) {
   );
 }
 
-function ProofsTab({ eventId, user }) {
+export function ProofsTab({ eventId, user }) {
   const proofs = useLoad(() => api.proofs(eventId), [eventId]);
   const folders = useLoad(() => api.dataFolders(eventId).then((r) => r?.folders || []).catch(() => []), [eventId]);
   const [list, setList] = useState(null);

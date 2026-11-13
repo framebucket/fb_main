@@ -1,9 +1,14 @@
 # FrameBucket mobile apps (Android APK + iOS)
 
-The Android and iOS apps are a native shell (Capacitor 7) around the live FrameBucket web app, the same idea
-as `desktop/`. They currently open the Railway deployment:
+The Android and iOS apps are a native shell (Capacitor 7) around FrameBucket's **phone interface**, served by
+the same backend at `/app` (source: `frontend/app.html` + `frontend/src/mobile/`). They currently open:
 
-    https://fbmain-production.up.railway.app
+    https://fbmain-production.up.railway.app/app
+
+The phone interface has its own screens (bottom tabs Home / Events / Enquiries / Money / More, sheets, pull to
+refresh, photo grid and viewer, background uploads). Settings and less frequent tools reuse the website's
+panels inside the app frame. Customers who sign in are sent to the customer portal. "More → Open the full
+website" shows the desktop layout. You can also try it in any phone browser at `/app`.
 
 Because the screens are loaded from the server, **web releases reach the phone apps immediately**. Rebuild
 the apps only when something in this folder changes (URL, icon, version, plugins).
@@ -121,11 +126,11 @@ Simulator app.
 
 ## Pointing at another server
 
-Change `server.url`, `allowNavigation` in `capacitor.config.json` and `www/config.js` (for example to
-`https://app.framebucket.in` when production moves), or for a one-off build:
+Change `server.url`, `allowNavigation` in `capacitor.config.json` and `www/config.js` (keep the `/app` path, for
+example `https://app.framebucket.in/app` when production moves), or for a one-off build:
 
 ```powershell
-$env:FB_APP_URL = "https://staging.example.com"; npm.cmd run apk
+$env:FB_APP_URL = "https://staging.example.com/app"; npm.cmd run apk
 ```
 
 The backend must allow the app's origin for cookies/CSRF just like the website (it is the same origin, since

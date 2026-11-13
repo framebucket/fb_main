@@ -14,4 +14,10 @@ public class SpaController {
     public String forwardToApp() {
         return "forward:/index.html";
     }
+
+    /** The phone interface used by the Android/iOS apps (hash routes, so one path is enough). */
+    @GetMapping({"/app", "/app/"})
+    public String forwardToMobileApp() {
+        return "forward:/app.html";
+    }
 }
