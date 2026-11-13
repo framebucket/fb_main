@@ -28,7 +28,7 @@ const NAV = [
   ['/enquiries', 'Enquiries', 'inbox', '3'],
   ['/customers', 'Customers', 'users', '4'],
   ['/calendar', 'Calendar', 'clock', '5'],
-  ['/money', 'Money', 'wallet', '6'],
+  ['/money', 'Payments', 'wallet', '6'],
   ['/team', 'Team', 'team', '7'],
 ];
 const NAV_STUDIO = [
@@ -290,7 +290,7 @@ function Shell({ user, setUser }) {
   }, []);
 
   useEffect(() => {
-    const titles = { home: 'Home', events: 'Events', enquiries: 'Enquiries', customers: 'Customers', calendar: 'Calendar', money: 'Money', team: 'Team', more: 'Settings' };
+    const titles = { home: 'Home', events: 'Events', enquiries: 'Enquiries', customers: 'Customers', calendar: 'Calendar', money: 'Payments', team: 'Team', more: 'Settings' };
     document.title = `${titles[route.parts[0]] || 'FrameBucket'} · FrameBucket`;
   }, [route.parts]);
 

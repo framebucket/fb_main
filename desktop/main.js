@@ -161,7 +161,7 @@ function buildMenu() {
         { label: 'Enquiries', accelerator: 'CmdOrCtrl+3', click: go('/enquiries') },
         { label: 'Customers', accelerator: 'CmdOrCtrl+4', click: go('/customers') },
         { label: 'Calendar', accelerator: 'CmdOrCtrl+5', click: go('/calendar') },
-        { label: 'Money', accelerator: 'CmdOrCtrl+6', click: go('/money') },
+        { label: 'Payments', accelerator: 'CmdOrCtrl+6', click: go('/money') },
         { label: 'Team', accelerator: 'CmdOrCtrl+7', click: go('/team') },
         { type: 'separator' },
         { label: 'Studio settings', accelerator: 'CmdOrCtrl+,', click: go('/more/studio') },

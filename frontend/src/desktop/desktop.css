@@ -100,8 +100,8 @@ kbd { font: 600 11px var(--fb-sans); color: var(--fb-faint); padding: 2px 6px; b
 .d-app .m-large-title h1 { font-size: 24px; }
 .d-app .m-body { padding: 0 20px; }
 .d-app .m-sticky-tools { margin: 0 -20px; padding: 6px 20px 10px; }
-.d-detail .m-body, .d-full .m-body { max-width: 920px; margin: 0 auto; width: 100%; box-sizing: border-box; }
-.d-wide .m-body { max-width: 1240px; }
+.d-detail .m-body, .d-full .m-body, .d-detail .m-large-title, .d-full .m-large-title { max-width: 920px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+.d-wide .m-body, .d-wide .m-large-title { max-width: 1240px; }
 .d-detail .m-body-flush { max-width: none; padding: 0 12px; }
 .d-detail[data-depth='2'] .m-appbar > .m-icon-button[aria-label='Back'] { display: none; }
 .d-detail[data-depth='2'] .m-appbar-title { padding-left: 14px; }

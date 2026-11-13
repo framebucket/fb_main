@@ -31,11 +31,11 @@ export function MoneyScreen({ view: initialView }) {
   }, [data, view]);
 
   if (!hasFeature(user, 'BILLING')) {
-    return <Screen large title="Money"><div className="m-embed"><UpgradeNotice feature="BILLING" title="Payments, receipts & expenses">Record client payments, share UPI payment QR codes, send GST receipts and track studio expenses.</UpgradeNotice></div></Screen>;
+    return <Screen large title="Payments"><div className="m-embed"><UpgradeNotice feature="BILLING" title="Payments, receipts & expenses">Record client payments, share UPI payment QR codes, send GST receipts and track studio expenses.</UpgradeNotice></div></Screen>;
   }
 
   return (
-    <Screen large title="Money" onRefresh={() => Promise.all([summary.reload(), expenses.reload()])}
+    <Screen large title="Payments" onRefresh={() => Promise.all([summary.reload(), expenses.reload()])}
       fab={view === 'expenses' ? <Fab label="Add expense" onClick={() => setAddingExpense(true)} /> : null}>
       <ErrorNote message={summary.error} onRetry={summary.reload} />
       {data ? (

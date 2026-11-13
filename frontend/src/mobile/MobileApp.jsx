@@ -19,7 +19,7 @@ const TABS = [
   ['/home', 'Home', 'home'],
   ['/events', 'Events', 'calendar'],
   ['/enquiries', 'Enquiries', 'inbox'],
-  ['/money', 'Money', 'wallet'],
+  ['/money', 'Payments', 'wallet'],
   ['/more', 'More', 'grid'],
 ];
 

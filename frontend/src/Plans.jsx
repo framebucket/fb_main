@@ -166,12 +166,78 @@ export function PlanUsageCard() {
   );
 }
 
+// Short names for the pricing cards and comparison (the long labels from the server stay on checkout).
+const SHORT_LABELS = {
+  CRM: 'Enquiries, bookings & calendar',
+  QUOTATIONS: 'Online quotes & PDFs',
+  CUSTOM_PACKAGES: 'Your own packages & add-ons',
+  LEAD_CAPTURE: 'Enquiry forms for web & Instagram',
+  TEAM: 'Team & freelancers',
+  GALLERY: 'Online galleries & photo selection',
+  DELIVERY_TRACKER: 'Delivery tracker for clients',
+  BILLING: 'Payments, receipts & UPI QR',
+  CONTRACTS: 'E-signed contracts & advances',
+  REMINDERS: 'Day-before reminders',
+  PORTFOLIO: 'Portfolio website',
+  E_ALBUM: 'E-album flipbooks',
+  ALBUM_PROOFING: 'Album proofing with comments',
+  FILMS: 'Film & video delivery',
+  WATERMARK: 'Watermarked previews',
+  CREW_PAYOUTS: 'Crew scheduling & payouts',
+  GEAR_COSTS: 'Gear & profit per event',
+  WHATSAPP_AUTOMATION: 'WhatsApp notifications',
+  FACE_RECOGNITION: 'AI face recognition',
+  PAID_DOWNLOADS: 'Paid photo downloads',
+  CUSTOM_BRANDING: 'Your branding & AI editing style',
+  AI_ALBUM_DESIGN: 'AI album design',
+  AI_INVITATIONS: 'AI wedding invitations',
+  INSIGHTS: 'Business insights',
+  CUSTOM_DOMAIN: 'Your own domain',
+  PRIORITY_SUPPORT: 'Priority support',
+};
+
+// What each card leads with: the features that matter most, in this order.
+const HIGHLIGHT_ORDER = ['CRM', 'QUOTATIONS', 'GALLERY', 'LEAD_CAPTURE',
+  'BILLING', 'CONTRACTS', 'E_ALBUM', 'WHATSAPP_AUTOMATION', 'ALBUM_PROOFING', 'FILMS',
+  'FACE_RECOGNITION', 'AI_ALBUM_DESIGN', 'AI_INVITATIONS', 'CUSTOM_BRANDING', 'PAID_DOWNLOADS', 'INSIGHTS',
+  'CUSTOM_DOMAIN', 'PRIORITY_SUPPORT'];
+const HIGHLIGHTS_PER_CARD = 4;
+
+// The comparison shows the features studios ask about, grouped; "Show all features" lists everything.
+const COMPARE_GROUPS = [
+  ['Bookings & clients', ['CRM', 'LEAD_CAPTURE', 'BILLING', 'CONTRACTS']],
+  ['Delivery', ['GALLERY', 'E_ALBUM', 'FILMS', 'PAID_DOWNLOADS']],
+  ['AI tools', ['FACE_RECOGNITION', 'AI_ALBUM_DESIGN', 'AI_INVITATIONS', 'CUSTOM_BRANDING']],
+  ['Running the studio', ['WHATSAPP_AUTOMATION', 'CREW_PAYOUTS', 'INSIGHTS', 'CUSTOM_DOMAIN', 'PRIORITY_SUPPORT']],
+];
+const COMPARE_LIMITS = [
+  ['storageGb', 'Photo storage'],
+  ['customers', 'Customers'],
+  ['upcomingEvents', 'Upcoming events'],
+  ['teamMembers', 'Team members'],
+  ['whatsappMessagesPerMonth', 'WhatsApp messages / month'],
+];
+
+function LimitValue({ name, value }) {
+  const text = limitText(name, value);
+  // "Unlimited" doesn't fit narrow phone columns; show ∞ there.
+  if (text === 'Unlimited') return <><span className="pp-long">Unlimited</span><span className="pp-short" title="Unlimited">∞</span></>;
+  return text;
+}
+
+function Mark({ included }) {
+  return included
+    ? <span className="pp-mark is-yes" aria-label="Included">✓</span>
+    : <span className="pp-mark is-no" aria-label="Not included">–</span>;
+}
+
 /** Public pricing: plan cards + comparison table. */
 export function PricingPlans({ navigate }) {
   const [plans, setPlans] = useState([]);
   const [billing, setBilling] = useState('YEARLY');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,81 +248,121 @@ export function PricingPlans({ navigate }) {
     return () => { cancelled = true; };
   }, []);
 
-  const labels = {};
-  plans.forEach((plan) => plan.features.forEach((code, index) => { labels[code] = plan.featureLabels[index]; }));
-  const featureRows = FEATURE_ORDER.filter((code) => labels[code]);
+  const longLabels = {};
+  plans.forEach((plan) => plan.features.forEach((code, index) => { longLabels[code] = plan.featureLabels[index]; }));
+  const label = (code) => SHORT_LABELS[code] || longLabels[code] || code;
+  const allRows = FEATURE_ORDER.filter((code) => longLabels[code]);
+  const groups = showAll
+    ? [['All features', allRows]]
+    : COMPARE_GROUPS.map(([title, codes]) => [title, codes.filter((code) => longLabels[code])]).filter(([, codes]) => codes.length);
+
+  const choose = (plan) => {
+    const free = Number(plan.monthlyPrice) === 0;
+    navigate(free ? '/register' : `/payment?planCode=${encodeURIComponent(plan.code)}&billing=${billing}`);
+  };
+  const perMonth = (plan) => (billing === 'YEARLY' ? Number(plan.yearlyPrice) / 12 : Number(plan.monthlyPrice));
 
   return (
-    <section className="pricing-section" id="pricing">
-      <div className="pricing-heading">
+    <section className="pricing-section pp" id="pricing">
+      <div className="pp-heading">
         <div>
           <h2>Plans that grow with your studio</h2>
-          <p>Start with a 14-day free trial of every Studio feature. Prices in INR, before 18% GST.</p>
+          <p>14-day free trial of every Studio feature. Prices in INR, before 18% GST.</p>
         </div>
-        <div className="billing-picker" role="group" aria-label="Pricing period">
-          <button className={billing === 'MONTHLY' ? 'selected' : ''} onClick={() => setBilling('MONTHLY')} aria-pressed={billing === 'MONTHLY'}>Monthly</button>
-          <button className={billing === 'YEARLY' ? 'selected' : ''} onClick={() => setBilling('YEARLY')} aria-pressed={billing === 'YEARLY'}>Yearly <span>2 months free</span></button>
+        <div className="pp-billing" role="group" aria-label="Pricing period">
+          <button type="button" className={billing === 'MONTHLY' ? 'is-active' : ''} onClick={() => setBilling('MONTHLY')} aria-pressed={billing === 'MONTHLY'}>Monthly</button>
+          <button type="button" className={billing === 'YEARLY' ? 'is-active' : ''} onClick={() => setBilling('YEARLY')} aria-pressed={billing === 'YEARLY'}>Yearly <span>2 months free</span></button>
         </div>
       </div>
       {loading && <p className="pricing-message">Loading plans…</p>}
       {error && <p className="form-error pricing-message">Could not load plans. {error}</p>}
       {!loading && !error && (
         <>
-          <div className="pricing-grid pricing-grid-v2">
-            {plans.map((plan) => {
+          <div className="pp-cards">
+            {plans.map((plan, index) => {
               const free = Number(plan.monthlyPrice) === 0;
-              const price = billing === 'YEARLY' ? plan.yearlyPrice : plan.monthlyPrice;
-              const perMonth = billing === 'YEARLY' ? Number(plan.yearlyPrice) / 12 : Number(plan.monthlyPrice);
+              const previous = plans[index - 1];
+              const fresh = plan.features.filter((code) => !previous || !previous.features.includes(code));
+              const ranked = HIGHLIGHT_ORDER.filter((code) => fresh.includes(code));
+              const highlights = (ranked.length ? ranked : fresh).slice(0, HIGHLIGHTS_PER_CARD);
+              const more = fresh.length - highlights.length;
               return (
-                <article className={`pricing-card${plan.highlighted ? ' is-highlighted' : ''}`} key={plan.code}>
-                  {plan.highlighted && <span className="pricing-badge">{plan.tagline || 'Most popular'}</span>}
-                  <h3>{plan.name}</h3>
-                  {!plan.highlighted && plan.tagline && <p className="plan-tagline">{plan.tagline}</p>}
-                  <p className="plan-description">{plan.description}</p>
-                  <div className="plan-price">
-                    <strong>{free ? '₹0' : inrPlain(perMonth)}</strong>
-                    <span>{free ? 'forever' : '/month'}</span>
+                <article className={`pp-card${plan.highlighted ? ' is-highlighted' : ''}`} key={plan.code}>
+                  {plan.highlighted && <span className="pp-badge">Most popular</span>}
+                  <header>
+                    <h3>{plan.name}</h3>
+                    <p className="pp-tagline">{plan.highlighted ? 'For growing studios' : plan.tagline}</p>
+                  </header>
+                  <div className="pp-price">
+                    <strong>{free ? '₹0' : inrPlain(perMonth(plan))}</strong>
+                    <span>{free ? 'free forever' : '/ month'}</span>
                   </div>
-                  {!free && <p className="plan-savings">{billing === 'YEARLY' ? `${inrPlain(price)} billed yearly · save ${inrPlain(plan.yearlySavings)}` : 'Billed monthly'}</p>}
-                  <ul className="plan-limits">
-                    <li><b>{limitText('storageGb', plan.limits.storageGb)}</b> photo storage</li>
-                    <li><b>{limitText('customers', plan.limits.customers)}</b> customers</li>
-                    <li><b>{limitText('teamMembers', plan.limits.teamMembers)}</b> team {plan.limits.teamMembers === 1 ? 'member' : 'members'}</li>
+                  <p className="pp-billed">{free ? 'No card needed' : billing === 'YEARLY' ? `${inrPlain(plan.yearlyPrice)} a year · save ${inrPlain(plan.yearlySavings)}` : 'Billed monthly'}</p>
+                  <ul className="pp-limits">
+                    <li><b>{limitText('storageGb', plan.limits.storageGb)}</b><span>storage</span></li>
+                    <li><b><LimitValue name="customers" value={plan.limits.customers} /></b><span>customers</span></li>
+                    <li><b>{limitText('teamMembers', plan.limits.teamMembers)}</b><span>{plan.limits.teamMembers === 1 ? 'seat' : 'seats'}</span></li>
                   </ul>
-                  <ul>
-                    {plan.featureLabels.map((label) => <li key={label}>{label}</li>)}
+                  <p className="pp-includes">{previous ? <>Everything in {previous.name}, plus</> : 'Includes'}</p>
+                  <ul className="pp-highlights">
+                    {highlights.map((code) => <li key={code}>{label(code)}</li>)}
+                    {more > 0 && <li className="pp-more">+ {more} more</li>}
                   </ul>
-                  <button
-                    className={`button button-full ${plan.highlighted ? 'button-gold' : 'button-dark'}`}
-                    onClick={() => navigate(free ? '/register' : `/payment?planCode=${encodeURIComponent(plan.code)}&billing=${billing}`)}
-                  >
+                  <button type="button" className={`pp-cta${plan.highlighted ? ' is-primary' : ''}`} onClick={() => choose(plan)}>
                     {free ? 'Start free' : `Choose ${plan.name}`}
                   </button>
                 </article>
               );
             })}
           </div>
-          <div className="comparison-section">
-            <div className="comparison-heading"><h3>Compare plans</h3><p>Every paid plan includes unlimited galleries, quotations and bookings.</p></div>
-            <div className="comparison-scroll">
-              <table className="plan-comparison">
-                <thead><tr><th scope="col">Plan</th>{plans.map((plan) => <th scope="col" key={plan.code}>{plan.name}</th>)}</tr></thead>
+
+          <div className="pp-compare">
+            <div className="pp-compare-heading">
+              <h3>Compare plans</h3>
+              <button type="button" className="pp-link" onClick={() => setShowAll((value) => !value)}>{showAll ? 'Show key features' : `Show all ${allRows.length} features`}</button>
+            </div>
+            <div className="pp-table-wrap">
+              <table className="pp-table">
+                <colgroup><col className="pp-col-label" />{plans.map((plan) => <col key={plan.code} className={plan.highlighted ? 'is-highlighted' : ''} />)}</colgroup>
+                <thead>
+                  <tr>
+                    <th scope="col"><span className="pp-visually-hidden">Feature</span></th>
+                    {plans.map((plan) => (
+                      <th scope="col" key={plan.code} className={plan.highlighted ? 'is-highlighted' : ''}>
+                        <b>{plan.name}</b>
+                        <small>{Number(plan.monthlyPrice) === 0 ? '₹0' : `${inrPlain(perMonth(plan))}/mo`}</small>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
                 <tbody>
-                  <tr className="comparison-price-row"><th scope="row">Monthly</th>{plans.map((plan) => <td key={plan.code}>{inrPlain(plan.monthlyPrice)}</td>)}</tr>
-                  <tr className="comparison-price-row"><th scope="row">Yearly <span>2 months free</span></th>{plans.map((plan) => <td key={plan.code}>{inrPlain(plan.yearlyPrice)}</td>)}</tr>
-                  {LIMIT_LABELS.map(([key, label]) => (
-                    <tr key={key}><th scope="row">{label}</th>{plans.map((plan) => <td key={plan.code}>{limitText(key, plan.limits[key])}</td>)}</tr>
-                  ))}
-                  {featureRows.map((code) => (
-                    <tr key={code}>
-                      <th scope="row">{labels[code]}</th>
-                      {plans.map((plan) => {
-                        const included = plan.features.includes(code);
-                        return <td key={plan.code}><span className={included ? 'comparison-mark included' : 'comparison-mark excluded'} aria-label={included ? 'Included' : 'Not included'}>{included ? '✓' : '—'}</span></td>;
-                      })}
+                  <tr className="pp-group"><th colSpan={plans.length + 1} scope="colgroup">Limits</th></tr>
+                  {COMPARE_LIMITS.map(([key, text]) => (
+                    <tr key={key}>
+                      <th scope="row">{text}</th>
+                      {plans.map((plan) => <td key={plan.code} className={plan.highlighted ? 'is-highlighted' : ''}><LimitValue name={key} value={plan.limits[key]} /></td>)}
                     </tr>
                   ))}
+                  {groups.map(([title, codes]) => [
+                    <tr className="pp-group" key={`g-${title}`}><th colSpan={plans.length + 1} scope="colgroup">{title}</th></tr>,
+                    ...codes.map((code) => (
+                      <tr key={code}>
+                        <th scope="row">{showAll ? longLabels[code] : label(code)}</th>
+                        {plans.map((plan) => <td key={plan.code} className={plan.highlighted ? 'is-highlighted' : ''}><Mark included={plan.features.includes(code)} /></td>)}
+                      </tr>
+                    )),
+                  ])}
                 </tbody>
+                <tfoot>
+                  <tr>
+                    <th scope="row" />
+                    {plans.map((plan) => (
+                      <td key={plan.code} className={plan.highlighted ? 'is-highlighted' : ''}>
+                        <button type="button" className={`pp-cta is-small${plan.highlighted ? ' is-primary' : ''}`} onClick={() => choose(plan)}>{Number(plan.monthlyPrice) === 0 ? 'Start' : 'Choose'}</button>
+                      </td>
+                    ))}
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>

@@ -485,7 +485,7 @@ button.m-stat { cursor: pointer; }
 .m-embed *, .m-embed *::before, .m-embed *::after { box-sizing: border-box; }
 .m-embed fieldset { min-width: 0; max-width: 100%; margin: 0 0 14px; }
 .m-embed * { min-width: 0; max-width: 100%; }
-.m-embed [class*='grid'], .m-embed [class*='stats'], .m-embed [class*='cards'] { grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)) !important; }
+.m-embed [class*='grid']:not(.pp-cards), .m-embed [class*='stats'], .m-embed [class*='cards']:not(.pp-cards) { grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)) !important; }
 .m-embed .studio-stat b, .m-embed [class*='insight'] b { overflow-wrap: anywhere; }
 .m-embed .customer-module-intro, .m-embed .event-module-caption { display: none; }
 .m-embed .event-module, .m-embed .studio-panel, .m-embed .customer-list-section:not([role='dialog']), .m-embed section:not([role='dialog']) { padding: 0 !important; margin: 0 0 14px; border: 0; background: none; box-shadow: none; max-width: 100%; }
@@ -501,7 +501,7 @@ button.m-stat { cursor: pointer; }
 .m-embed .event-form-actions, .m-embed .customer-form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .m-embed .button { min-height: 44px; }
 .m-embed .customer-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 calc(var(--m-pad) * -1); padding: 0 var(--m-pad); }
-.m-embed table { font-size: 13.5px; }
+.m-embed table:not(.pp-table) { font-size: 13.5px; }
 .m-embed .studio-billing-grid, .m-embed .studio-calendar-layout, .m-embed .overview-charts-grid { grid-template-columns: 1fr !important; }
 .m-embed .growth-step { flex-wrap: wrap; }
 .m-embed .growth-step-fields { flex-wrap: wrap; }
@@ -509,7 +509,6 @@ button.m-stat { cursor: pointer; }
 .m-embed .growth-video { width: 100%; height: auto; aspect-ratio: 16 / 9; }
 .m-embed img { max-width: 100%; height: auto; }
 .m-embed .plan-card { grid-template-columns: 1fr !important; margin: 0 0 16px; }
-.m-embed .pricing-grid, .m-embed .plan-grid { grid-template-columns: 1fr !important; }
 .m-embed .upgrade-notice { margin: 8px 0; }
 .m-embed-compact { padding: 12px 14px; }
 .m-embed-compact .growth-booking-cell { display: grid; gap: 8px; }
@@ -525,7 +524,7 @@ button.m-stat { cursor: pointer; }
 .m-embed .modal-backdrop .modal-close { position: static; flex: none; width: 40px; height: 40px; }
 .modal-backdrop .customer-detail-modal, .modal-backdrop .event-modal { max-width: 100vw; }
 /* Wide tables scroll sideways inside their card instead of being cut off. */
-.m-embed table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; width: auto; }
+.m-embed table:not(.pp-table) { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; width: auto; }
 
 /* ------------------------------------------------------------------ on-screen keyboard */
 /* --m-kb is how much of the screen the keyboard covers (see keyboard.js). */
