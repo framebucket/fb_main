@@ -17,6 +17,7 @@ Text notification templates are sent as **body-only positional templates**. Put 
 | Customer receives a mobile verification code | `framebucket_mobile_verification` | Authentication | `{{1}}` OTP code in the body; the current sender also sends it to URL button index `0` |
 | Photographer receives the private photo ZIP after album selection is finalized | `framebucket_album_selection_finalized` | Utility | `{{1}}` customer name; `{{2}}` private raw-photo ZIP URL |
 | Guest receives a matched event photo | `framebucket_event_photo_match` | Utility | Image header; body: `{{1}}` guest name; `{{2}}` event type; `{{3}}` photo number |
+| Day-before shoot reminder (sent to the customer and the assigned photographer; only when `WHATSAPP_EVENT_REMINDER_TEMPLATE` is set) | `framebucket_event_reminder` | Utility | `{{1}}` event type; `{{2}}` studio name; `{{3}}` date and time; `{{4}}` location |
 
 ## Suggested template bodies
 
@@ -88,6 +89,17 @@ Regards,
 framebucket.in
 ```
 
+### `framebucket_event_reminder`
+
+```text
+Reminder: your {{1}} with {{2}} is tomorrow, {{3}}.
+
+Location: {{4}}
+
+See you there!
+framebucket.in
+```
+
 ### Mobile verification template
 
 Keep the existing approved authentication template because the current OTP sender sends the OTP as body parameter `{{1}}` and as a URL-button parameter (`sub_type: url`, index `0`). If you change the template's button type or remove the URL button, update `WhatsAppMobileOtpSender` to match before deploying.
@@ -149,6 +161,10 @@ WHATSAPP_ALBUM_DESIGN_TEMPLATE=framebucket_album_selection_finalized
 WHATSAPP_ALBUM_DESIGN_TEMPLATE_LANGUAGE=en_US
 WHATSAPP_PHOTO_MATCH_TEMPLATE=framebucket_event_photo_match
 WHATSAPP_PHOTO_MATCH_TEMPLATE_LANGUAGE=en_US
+WHATSAPP_EVENT_UPDATE_TEMPLATE=framebucket_event_details_updated
+WHATSAPP_EVENT_UPDATE_TEMPLATE_LANGUAGE=en_US
+WHATSAPP_EVENT_REMINDER_TEMPLATE=framebucket_event_reminder
+WHATSAPP_EVENT_REMINDER_TEMPLATE_LANGUAGE=en_US
 GALLERY_PHOTO_DELIVERY_POLL_MS=5000
 ```
 
