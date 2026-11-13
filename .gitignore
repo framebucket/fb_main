@@ -16,3 +16,7 @@ Thumbs.db
 
 # End-to-end test output
 e2e/out/
+
+# Desktop app build output
+desktop/node_modules/
+desktop/dist/

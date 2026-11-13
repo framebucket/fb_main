@@ -1,0 +1,44 @@
+{
+  "name": "framebucket-desktop",
+  "productName": "FrameBucket",
+  "version": "1.0.0",
+  "description": "FrameBucket desktop app for Windows and macOS",
+  "author": "SK FrameTech Solutions <info@framebucket.in>",
+  "homepage": "https://www.framebucket.in",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis --x64",
+    "dist:mac": "electron-builder --mac dmg --universal",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "in.framebucket.desktop",
+    "productName": "FrameBucket",
+    "copyright": "© SK FrameTech Solutions",
+    "artifactName": "FrameBucket-${version}-${os}-${arch}.${ext}",
+    "files": ["main.js", "config.json", "offline.html", "build/icon.png"],
+    "directories": { "output": "dist", "buildResources": "build" },
+    "win": { "target": ["nsis"], "icon": "build/icon.png" },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FrameBucket"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.photography",
+      "icon": "build/icon.png",
+      "hardenedRuntime": true
+    },
+    "dmg": { "title": "FrameBucket ${version}" }
+  }
+}

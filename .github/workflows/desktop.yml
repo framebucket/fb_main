@@ -1,0 +1,83 @@
+name: Desktop apps
+
+# Builds the FrameBucket desktop installers from desktop/: a Windows .exe (on Windows) and a macOS .dmg
+# (on macOS, Intel + Apple Silicon). Run it by hand from the Actions tab, or push a tag such as
+# desktop-v1.0.1 to also publish a GitHub Release with both files.
+# Optional signing secrets: WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD (Windows), MAC_CSC_LINK / MAC_CSC_KEY_PASSWORD,
+# APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID (macOS). Without them the apps are built unsigned.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "desktop-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build for ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            script: dist:win
+            files: desktop/dist/*.exe
+          - name: macOS
+            os: macos-latest
+            script: dist:mac
+            files: desktop/dist/*.dmg
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Build installer
+        run: npm run ${{ matrix.script }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ (matrix.name == 'Windows' && secrets.WIN_CSC_LINK != '') || (matrix.name == 'macOS' && secrets.MAC_CSC_LINK != '') }}
+          CSC_LINK: ${{ matrix.name == 'Windows' && secrets.WIN_CSC_LINK || secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ matrix.name == 'Windows' && secrets.WIN_CSC_KEY_PASSWORD || secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: FrameBucket-${{ matrix.name }}
+          path: ${{ matrix.files }}
+          retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" installers/* \
+            --repo "$GITHUB_REPOSITORY" --title "FrameBucket desktop ${GITHUB_REF_NAME#desktop-v}" \
+            --notes "Windows installer (.exe) and macOS disk image (.dmg). Unsigned builds: see desktop/README.md."
