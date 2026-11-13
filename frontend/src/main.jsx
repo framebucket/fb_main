@@ -18,6 +18,18 @@ if (isNativeApp()) {
   }
 }
 
+// The Windows/Mac app (Electron) gets the desktop app interface at /desktop.
+if (typeof navigator !== 'undefined' && /Electron\//.test(navigator.userAgent)) {
+  let wantsWebsite = false;
+  try {
+    if (new URLSearchParams(window.location.search).get('desktop') === '1') sessionStorage.setItem('fb-desktop', '1');
+    wantsWebsite = sessionStorage.getItem('fb-desktop') === '1';
+  } catch { /* storage unavailable */ }
+  if (!wantsWebsite && ['/', '/login', '/dashboard'].includes(window.location.pathname.replace(/\/+$/, '') || '/')) {
+    window.location.replace('/desktop');
+  }
+}
+
 initTheme();
 installNativeDownloadLinks(import.meta.env.VITE_API_BASE_URL || '');
 

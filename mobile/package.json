@@ -5,7 +5,9 @@
   "author": "SK FrameTech Solutions <info@framebucket.in>",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "android:prepare": "node scripts/build.mjs prepare android",
     "apk": "node scripts/build.mjs apk",
@@ -22,6 +24,7 @@
     "@capacitor/core": "^7.4.0",
     "@capacitor/filesystem": "^7.1.0",
     "@capacitor/ios": "^7.4.0",
+    "@capacitor/keyboard": "^7.0.0",
     "@capacitor/share": "^7.0.0",
     "@capacitor/splash-screen": "^7.0.0",
     "@capacitor/status-bar": "^7.0.0"

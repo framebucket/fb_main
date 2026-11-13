@@ -72,6 +72,11 @@ function applyUrlOverride(nativeConfigFile) {
 }
 
 function patchAndroid() {
+  // Shrink the app when the keyboard opens, so forms stay visible above it.
+  edit(path.join(root, 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), (text) => {
+    if (/windowSoftInputMode=/.test(text)) return text.replace(/android:windowSoftInputMode="[^"]*"/, 'android:windowSoftInputMode="adjustResize"');
+    return text.replace(/<activity\b/, '<activity\n            android:windowSoftInputMode="adjustResize"');
+  });
   edit(path.join(root, 'android', 'app', 'build.gradle'), (text) => text
     .replace(/versionCode\s+\d+/, `versionCode ${buildNumber}`)
     .replace(/versionName\s+"[^"]*"/, `versionName "${version}"`));

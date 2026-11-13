@@ -6,10 +6,12 @@ export default defineConfig({
   plugins: [react()],
   build: {
     rollupOptions: {
-      // Two pages: the website (index.html) and the phone interface used by the Android/iOS apps (app.html → /app).
+      // Three pages: the website (index.html), the phone interface for the Android/iOS apps (app.html → /app)
+      // and the desktop app interface for the Windows/Mac app (desktop.html → /desktop).
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         app: fileURLToPath(new URL('./app.html', import.meta.url)),
+        desktop: fileURLToPath(new URL('./desktop.html', import.meta.url)),
       },
     },
   },

@@ -1,14 +1,25 @@
 # FrameBucket desktop app (Windows .exe and macOS .dmg)
 
-A small Electron wrapper that opens the live FrameBucket web app in its own window, with the FrameBucket
-icon, a start-menu / dock entry and downloads that ask where to save. The app itself is loaded from the
-server, so every web release (new features, fixes) reaches desktop users at once — **you only rebuild the
-installers when this folder changes** (icon, `config.json`, `main.js`) or to bump Electron for security.
+An Electron app for FrameBucket's **desktop interface** (`/desktop` on the server; source in
+`frontend/desktop.html` + `frontend/src/desktop/`, sharing its screens with the phone app in `frontend/src/mobile/`).
+
+What makes it feel like a native app:
+- Its own title bar with the real Windows minimise / maximise / close buttons (macOS: traffic lights), coloured
+  to match light or dark mode. The window remembers its size and position.
+- Sidebar navigation and Mail-style split views: lists on the left, the selected event, enquiry or customer on the right.
+- Centred dialogs, hover states, Esc to close, drag-and-drop photo upload onto a gallery.
+- Shortcuts: Ctrl+K search everything, Ctrl+N new (event, enquiry, customer… for the screen you're on),
+  Ctrl+1…7 sections, Ctrl+\ sidebar, F5 refresh, Ctrl+, studio settings, Alt+← back.
+- Downloads ask where to save and flash the taskbar when done; other sites open in the normal browser.
+
+The interface is loaded from the server, so every web release reaches desktop users at once — **you only
+rebuild the installers when this folder changes** (icon, `config.json`, `main.js`, `preload.js`) or to bump
+Electron for security. "Classic web layout" (globe icon at the bottom of the sidebar) opens the old website layout.
 
 ## Change the server address
 
 Edit `config.json` → `appUrl` (e.g. `https://app.framebucket.in` once you move off Railway) and add the
-host to `allowedHosts`. Pages outside `allowedHosts` open in the normal browser.
+host to `allowedHosts`. `startPath` is the page the window opens (`/desktop`). Pages outside `allowedHosts` open in the normal browser.
 
 ## Build it yourself
 
@@ -19,7 +30,7 @@ You need Node.js 20+ and internet access for `npm install`.
 ```bash
 cd desktop
 npm install
-npm run dist:win          # -> desktop/dist/FrameBucket-1.0.0-win-x64.exe
+npm run dist:win          # -> desktop/dist/FrameBucket-1.1.0-win-x64.exe
 ```
 
 **macOS (.dmg)** — must be built on a Mac (Apple's disk-image tools only exist there):
@@ -27,7 +38,7 @@ npm run dist:win          # -> desktop/dist/FrameBucket-1.0.0-win-x64.exe
 ```bash
 cd desktop
 npm install
-npm run dist:mac          # -> desktop/dist/FrameBucket-1.0.0-mac-universal.dmg (Intel + Apple Silicon)
+npm run dist:mac          # -> desktop/dist/FrameBucket-1.1.0-mac-universal.dmg (Intel + Apple Silicon)
 ```
 
 **Both, without a Mac** — GitHub Actions: run the workflow **Desktop apps** (Actions tab → Run workflow).

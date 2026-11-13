@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api.js';
 import { EnquiryBookingCell, useEnquiryTracking } from '../../Bookings.jsx';
-import { navigate } from '../router.js';
+import { navigate, useRoute } from '../router.js';
+import { useEmbedClass } from '../layout.js';
 import { useUser } from '../session.js';
 import { ActionPill, Avatar, Button, Card, Chip, Empty, ErrorNote, Fab, Field, Icon, List, Row, Screen, Search, Section, Segmented, Sheet, Skeleton, useAction, useResource } from '../ui.jsx';
 import { dayDate, inr, openFile, relativeDay, telLink, whatsappLink } from '../format.js';
@@ -18,6 +19,7 @@ export function EnquiriesScreen({ filter }) {
   const [view, setView] = useState(['new', 'quoted', 'booked'].includes(filter) ? filter : 'all');
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
+  const route = useRoute();
   useEffect(() => { if (['new', 'quoted', 'booked'].includes(filter)) setView(filter); }, [filter]);
 
   const counts = useMemo(() => {
@@ -51,7 +53,7 @@ export function EnquiriesScreen({ filter }) {
             const stage = enquiryStage(enquiry);
             const amount = enquiry.finalizedQuote ?? enquiry.quotationPrice;
             return (
-              <Row key={enquiry.id} leading={<Avatar name={enquiry.name} />} onClick={() => navigate(`/enquiries/${enquiry.id}`)}
+              <Row key={enquiry.id} selected={route.parts[1] === String(enquiry.id)} leading={<Avatar name={enquiry.name} />} onClick={() => navigate(`/enquiries/${enquiry.id}`)}
                 title={enquiry.name}
                 subtitle={<>{enquiry.eventName}{enquiry.createdAt ? ` · ${relativeDay(enquiry.createdAt)}` : ''}</>}
                 meta={<span className="m-row-meta-stack">{amount != null && <b>{inr(amount)}</b>}<Chip tone={stage.tone}>{stage.label}</Chip></span>}
@@ -73,6 +75,7 @@ export function EnquiryDetailScreen({ enquiryId }) {
     return found;
   }), [enquiryId]);
   const tracking = useEnquiryTracking(enquiryId);
+  const embedClass = useEmbedClass();
   const enquiry = data.data;
   const [finalQuote, setFinalQuote] = useState(null);
   const [creatingEvent, setCreatingEvent] = useState(false);
@@ -129,7 +132,7 @@ export function EnquiryDetailScreen({ enquiryId }) {
       </Section>
 
       <Section title="Follow-up & contract">
-        <Card className="m-embed m-embed-compact">
+        <Card className={`${embedClass} m-embed-compact`}>
           <EnquiryBookingCell enquiry={enquiry} tracking={tracking.map[enquiry.id]} user={user} onChanged={tracking.reload} />
         </Card>
       </Section>

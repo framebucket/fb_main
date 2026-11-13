@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { api } from '../../api.js';
-import { navigate } from '../router.js';
+import { navigate, useRoute } from '../router.js';
 import { ActionPill, Avatar, Button, Empty, ErrorNote, Fab, KeyValue, Row, Screen, Search, Section, Skeleton, Stat, useResource } from '../ui.jsx';
 import { dayDate, inr, inrShort, plural, telLink, whatsappLink } from '../format.js';
 import { EventCard, NewCustomerSheet, NewEventSheet } from './common.jsx';
@@ -9,6 +9,7 @@ export function CustomersScreen() {
   const data = useResource(() => api.customers(), []);
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
+  const route = useRoute();
   const list = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return [...(data.data || [])]
@@ -26,7 +27,7 @@ export function CustomersScreen() {
       ) : (
         <div className="m-list">
           {list.map((customer) => (
-            <Row key={customer.id} leading={<Avatar name={customer.name} />} onClick={() => navigate(`/customers/${customer.id}`)}
+            <Row key={customer.id} selected={route.parts[1] === String(customer.id)} leading={<Avatar name={customer.name} />} onClick={() => navigate(`/customers/${customer.id}`)}
               title={customer.name} subtitle={customer.mobileNumber}
               meta={<span className="m-row-meta-stack"><b>{plural(customer.eventsBooked || 0, 'event')}</b>{Number(customer.totalRevenueGenerated) > 0 && <small>{inrShort(customer.totalRevenueGenerated)}</small>}</span>} />
           ))}

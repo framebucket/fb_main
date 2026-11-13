@@ -1,4 +1,10 @@
 {
   "appUrl": "https://fbmain-production.up.railway.app",
-  "allowedHosts": ["fbmain-production.up.railway.app", "fbdata-production.up.railway.app", "framebucket.in", "www.framebucket.in"]
+  "startPath": "/desktop",
+  "allowedHosts": [
+    "fbmain-production.up.railway.app",
+    "fbdata-production.up.railway.app",
+    "framebucket.in",
+    "www.framebucket.in"
+  ]
 }

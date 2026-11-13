@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api.js';
-import { navigate } from '../router.js';
+import { navigate, useRoute } from '../router.js';
 import { Button, Chip, Field, Icon, Sheet, useAction } from '../ui.jsx';
 import { dateParts, eventPrice, relativeDay, timeLabel, todayIso } from '../format.js';
 
@@ -9,8 +9,11 @@ import { dateParts, eventPrice, relativeDay, timeLabel, todayIso } from '../form
 export function EventCard({ event, balance, compact }) {
   const parts = dateParts(event.eventDate);
   const past = event.eventDate < todayIso();
+  const route = useRoute();
+  const selected = route.parts[0] === 'events' && route.parts[1] === String(event.id);
   return (
-    <button type="button" className={`m-event-card${past ? ' is-past' : ''}${compact ? ' is-compact' : ''}`} onClick={() => navigate(`/events/${event.id}`)}>
+    <button type="button" className={`m-event-card${past ? ' is-past' : ''}${compact ? ' is-compact' : ''}${selected ? ' is-selected' : ''}`}
+      aria-current={selected ? 'true' : undefined} onClick={() => navigate(`/events/${event.id}`)}>
       <span className="m-date-block">
         <small>{parts.month}</small>
         <b>{parts.day}</b>

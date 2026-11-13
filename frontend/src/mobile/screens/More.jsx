@@ -9,6 +9,7 @@ import { BrandingSettings, EditingStyleSettings } from '../../Delivery.jsx';
 import { useTheme } from '../../theme.jsx';
 import { navigate } from '../router.js';
 import { useUser } from '../session.js';
+import { useEmbedClass } from '../layout.js';
 import { Avatar, Button, Chip, Empty, ErrorNote, Fab, Field, Icon, List, Row, Screen, Section, Segmented, Sheet, Skeleton, useAction, useResource, useToast } from '../ui.jsx';
 import { telLink, whatsappLink } from '../format.js';
 
@@ -83,10 +84,11 @@ export function MoreScreen() {
 export function MoreSectionScreen({ section }) {
   const { user } = useUser();
   const config = SECTIONS[section];
+  const embedClass = useEmbedClass();
   if (!config) return <Screen back backTo="/more" title="Not found"><Empty title="This page doesn't exist" /></Screen>;
   return (
     <Screen back backTo="/more" title={config.title}>
-      <div className="m-embed">{config.render(user)}</div>
+      <div className={embedClass}>{config.render(user)}</div>
     </Screen>
   );
 }

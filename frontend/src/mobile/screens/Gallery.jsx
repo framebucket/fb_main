@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../../api.js';
 import { navigate } from '../router.js';
 import { useUser } from '../session.js';
-import { Button, Empty, ErrorNote, Fab, Field, Icon, Layer, Screen, Sheet, Skeleton, useAction, useBackToClose, useResource, useToast } from '../ui.jsx';
+import { Button, Empty, ErrorNote, Fab, Field, Icon, Layer, Screen, Sheet, Skeleton, useAction, useBackToClose, useEscape, useResource, useToast } from '../ui.jsx';
 import { openFile, plural } from '../format.js';
 import { enqueueUploads, useUploadFinished } from '../uploads.js';
 import { useEvent } from './EventDetail.jsx';
@@ -32,6 +32,38 @@ export default function GalleryScreen({ eventId, folder, upload }) {
 
   useUploadFinished(eventId, folderId, () => media.reload());
 
+  // Desktop: drop photos anywhere on the window to upload them into the open folder.
+  const [dragging, setDragging] = useState(false);
+  const toast = useToast();
+  const dropTarget = useRef({ folderId, name: 'Gallery' });
+  useEffect(() => {
+    const hasFiles = (event) => Array.from(event.dataTransfer?.types || []).includes('Files');
+    let depth = 0;
+    const enter = (event) => { if (hasFiles(event)) { depth += 1; setDragging(true); } };
+    const leave = () => { depth = Math.max(0, depth - 1); if (!depth) setDragging(false); };
+    const over = (event) => { if (hasFiles(event)) event.preventDefault(); };
+    const drop = (event) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      depth = 0;
+      setDragging(false);
+      const files = Array.from(event.dataTransfer.files || []);
+      if (!files.length) return;
+      enqueueUploads(eventId, dropTarget.current.folderId, files);
+      toast(`Uploading ${plural(files.length, 'file')} to ${dropTarget.current.name}.`);
+    };
+    window.addEventListener('dragenter', enter);
+    window.addEventListener('dragleave', leave);
+    window.addEventListener('dragover', over);
+    window.addEventListener('drop', drop);
+    return () => {
+      window.removeEventListener('dragenter', enter);
+      window.removeEventListener('dragleave', leave);
+      window.removeEventListener('dragover', over);
+      window.removeEventListener('drop', drop);
+    };
+  }, [eventId, toast]);
+
   useEffect(() => {
     // Remember the folder in the URL so back/forward and refresh keep it.
     navigate(`/events/${eventId}/gallery${folderId !== 'root' ? `?folder=${encodeURIComponent(folderId)}` : ''}`, { replace: true });
@@ -47,6 +79,7 @@ export default function GalleryScreen({ eventId, folder, upload }) {
 
   const allFolders = folders.data?.length ? folders.data : [{ folder_id: 'root', name: 'Gallery' }];
   const currentName = allFolders.find((item) => item.folder_id === folderId)?.name || 'Gallery';
+  dropTarget.current = { folderId, name: currentName };
 
   return (
     <Screen back backTo={`/events/${eventId}`} title={currentName} subtitle={event.data ? `${event.data.eventTypeName} · ${event.data.customerName}` : ''}
@@ -76,6 +109,7 @@ export default function GalleryScreen({ eventId, folder, upload }) {
       )}
       <UploadSheet open={sheet === 'upload'} onClose={() => setSheet('')} eventId={eventId} folderId={folderId} folderName={currentName} />
       <NewFolderSheet open={sheet === 'folder'} onClose={() => setSheet('')} eventId={eventId} onCreated={(created) => { folders.setData((current) => [...(current || []), created]); setFolderId(created.folder_id); }} />
+      {dragging && <Layer><div className="m-dropzone"><Icon name="upload" size={40} /><b>Drop to upload to {currentName}</b><span>Photos, RAW files and videos</span></div></Layer>}
       {viewer >= 0 && <Viewer items={items} index={viewer} eventId={eventId} onIndex={setViewer} onClose={() => setViewer(-1)} />}
     </Screen>
   );
@@ -99,6 +133,15 @@ function Viewer({ items, index, eventId, onIndex, onClose }) {
   const [busy, run] = useAction();
   const [dragX, setDragX] = useState(0);
   const start = useRef(null);
+  useEscape(true, onClose);
+  useEffect(() => {
+    const keys = (event) => {
+      if (event.key === 'ArrowRight') onIndex(Math.min(items.length - 1, index + 1));
+      if (event.key === 'ArrowLeft') onIndex(Math.max(0, index - 1));
+    };
+    window.addEventListener('keydown', keys);
+    return () => window.removeEventListener('keydown', keys);
+  }, [index, items.length, onIndex]);
   const item = items[index];
   if (!item) return null;
   const ready = item.status !== 'QUEUED' && item.status !== 'PROCESSING' && item.status !== 'PROCESSING_FAILED';
@@ -160,7 +203,7 @@ function UploadSheet({ open, onClose, eventId, folderId, folderName }) {
           <input type="file" multiple accept={RAW_ACCEPT} onChange={pick} />
         </label>
       </div>
-      <p className="m-muted m-small">Keep the app open until uploads finish. Originals stay private; customers only see processed previews.</p>
+      <p className="m-muted m-small">On a computer you can also drag files onto the gallery. Keep the app open until uploads finish. Originals stay private; customers only see processed previews.</p>
     </Sheet>
   );
 }

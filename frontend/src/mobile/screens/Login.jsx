@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { api } from '../../api.js';
 import { Button, Field, Segmented, useToast } from '../ui.jsx';
+import { useLayout } from '../layout.js';
 
 export default function LoginScreen({ onLogin }) {
   const toast = useToast();
+  const layout = useLayout();
   const [mode, setMode] = useState('photographer');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -65,7 +67,7 @@ export default function LoginScreen({ onLogin }) {
       <div className="m-login-hero">
         <img src="/framebucket-mark.png" alt="" className="m-login-mark" />
         <h1>FrameBucket</h1>
-        <p>{mode === 'photographer' ? 'Your studio, in your pocket.' : 'Your memories, close by.'}</p>
+        <p>{mode === 'photographer' ? (layout === 'desktop' ? 'Your whole studio, in one place.' : 'Your studio, in your pocket.') : 'Your memories, close by.'}</p>
       </div>
       <div className="m-login-card">
         <Segmented value={mode} onChange={(value) => { setMode(value); setError(''); }} options={[['photographer', 'Photographer'], ['customer', 'Customer']]} />

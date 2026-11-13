@@ -155,6 +155,28 @@ export function useBackToClose(open, onClose) {
   }, [open]);
 }
 
+/** Esc closes the topmost dialog (desktop). */
+const escapeStack = [];
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && escapeStack.length) {
+    event.preventDefault();
+    escapeStack[escapeStack.length - 1].current();
+  }
+});
+
+export function useEscape(open, onClose) {
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    if (!open) return undefined;
+    escapeStack.push(closeRef);
+    return () => {
+      const index = escapeStack.indexOf(closeRef);
+      if (index >= 0) escapeStack.splice(index, 1);
+    };
+  }, [open]);
+}
+
 // ------------------------------------------------------------------------------------- layout
 
 function PullToRefresh({ onRefresh, scrollRef }) {
@@ -206,6 +228,14 @@ function PullToRefresh({ onRefresh, scrollRef }) {
 export function Screen({ title, subtitle, back, backTo, actions, onRefresh, fab, large, children, className = '', flush }) {
   const scrollRef = useRef(null);
   const [scrolled, setScrolled] = useState(false);
+  // The desktop app's Refresh (F5 / menu) reloads whatever screens are on show.
+  const refreshRef = useRef(onRefresh);
+  refreshRef.current = onRefresh;
+  useEffect(() => {
+    const refresh = () => refreshRef.current?.();
+    window.addEventListener('fb-refresh', refresh);
+    return () => window.removeEventListener('fb-refresh', refresh);
+  }, []);
   return (
     <section className={`m-screen ${className}`}>
       <header className={`m-appbar${scrolled || !large ? ' is-solid' : ''}`}>
@@ -253,7 +283,7 @@ export function List({ children, inset = true }) {
   return <div className={inset ? 'm-list' : 'm-list m-list-flat'}>{children}</div>;
 }
 
-export function Row({ icon, leading, title, subtitle, meta, trailing, onClick, href, chevron = Boolean(onClick || href), tone, multiline }) {
+export function Row({ icon, leading, title, subtitle, meta, trailing, onClick, href, chevron = Boolean(onClick || href), tone, multiline, selected }) {
   const content = (
     <>
       {leading || (icon && <span className={`m-row-icon${tone ? ` m-tone-${tone}` : ''}`}><Icon name={icon} size={20} /></span>)}
@@ -266,9 +296,10 @@ export function Row({ icon, leading, title, subtitle, meta, trailing, onClick, h
       {chevron && <Icon name="chevron" size={18} className="m-row-chevron" />}
     </>
   );
-  if (href) return <a className="m-row" href={href}>{content}</a>;
-  if (onClick) return <button type="button" className="m-row" onClick={onClick}>{content}</button>;
-  return <div className="m-row">{content}</div>;
+  const className = selected ? 'm-row is-selected' : 'm-row';
+  if (href) return <a className={className} href={href}>{content}</a>;
+  if (onClick) return <button type="button" className={className} onClick={onClick} aria-current={selected ? 'true' : undefined}>{content}</button>;
+  return <div className={className}>{content}</div>;
 }
 
 export function Chip({ children, tone = 'neutral', icon }) {
@@ -343,6 +374,7 @@ export function Search({ value, onChange, placeholder }) {
 
 export function Sheet({ open, title, onClose, children, footer, tall }) {
   useBackToClose(open, onClose);
+  useEscape(open, onClose);
   useEffect(() => {
     if (!open) return undefined;
     document.body.classList.add('m-no-scroll');

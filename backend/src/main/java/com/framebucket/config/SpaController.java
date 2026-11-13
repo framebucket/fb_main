@@ -20,4 +20,10 @@ public class SpaController {
     public String forwardToMobileApp() {
         return "forward:/app.html";
     }
+
+    /** The desktop app interface used by the Windows/Mac app. */
+    @GetMapping({"/desktop", "/desktop/"})
+    public String forwardToDesktopApp() {
+        return "forward:/desktop.html";
+    }
 }

@@ -53,7 +53,8 @@ export default function HomeScreen() {
       </div>
 
       {!view ? <Skeleton rows={3} /> : (
-        <>
+        <div className="m-home-grid">
+          <div className="m-home-main">
           <Section title="Today" action={<span className="m-section-note">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</span>}>
             {view.todays.length ? (
               <div className="m-stack">{view.todays.map((event) => <EventCard key={event.id} event={event} balance={view.balances.get(event.id)} />)}</div>
@@ -67,7 +68,9 @@ export default function HomeScreen() {
               </Card>
             )}
           </Section>
+          </div>
 
+          <div className="m-home-side">
           <div className="m-stat-row">
             <Stat icon="wallet" label="Outstanding" value={finance ? inrShort(finance.outstanding) : '—'} tone={finance && Number(finance.outstanding) > 0 ? 'warn' : undefined} onClick={() => navigate('/money')} />
             <Stat icon="rupee" label="Received" value={finance ? inrShort(finance.received) : '—'} tone="good" onClick={() => navigate('/money')} />
@@ -84,12 +87,15 @@ export default function HomeScreen() {
               </List>
             </Section>
           )}
+          </div>
 
+          <div className="m-home-main">
           <Section title="Coming up" action={<button type="button" className="m-text-button" onClick={() => navigate('/events')}>All events</button>}>
             {view.upcoming.length ? <div className="m-stack">{view.upcoming.map((event) => <EventCard key={event.id} event={event} balance={view.balances.get(event.id)} />)}</div>
               : <p className="m-muted m-pad">No upcoming events. Tap “Event” above to add one.</p>}
           </Section>
-        </>
+          </div>
+        </div>
       )}
 
       <NewEnquirySheet open={sheet === 'enquiry'} onClose={() => setSheet('')} onCreated={(created) => navigate(`/enquiries/${created.id}`)} />

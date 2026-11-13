@@ -5,6 +5,7 @@ import { DeliveryTab, FilmsTab, ProofsTab } from '../../Delivery.jsx';
 import { CrewTab, GearCostsTab } from '../../Crew.jsx';
 import { navigate } from '../router.js';
 import { useUser } from '../session.js';
+import { useEmbedClass } from '../layout.js';
 import { ActionPill, Button, Chip, Empty, ErrorNote, Field, Icon, KeyValue, List, ProgressBar, Row, Screen, Section, Segmented, Sheet, Skeleton, useAction, useResource } from '../ui.jsx';
 import { dayDate, eventPrice, inr, mapsLink, relativeDay, telLink, timeLabel, whatsappLink } from '../format.js';
 
@@ -57,7 +58,7 @@ export default function EventDetailScreen({ eventId }) {
 
           <Section title="Details">
             <List>
-              <Row icon="user" title={data.assigneeName || 'Assign a photographer'} subtitle={data.assigneeName ? 'Assigned · tap to change' : 'They get a WhatsApp message with the details'} tone={data.assigneeName ? undefined : 'warn'} onClick={() => setSheet('assignee')} />
+              <Row icon="user" title={data.assigneeName || 'Assign a photographer'} subtitle={data.assigneeName ? 'Assigned · change' : 'They get a WhatsApp message with the details'} tone={data.assigneeName ? undefined : 'warn'} onClick={() => setSheet('assignee')} />
               <Row icon="clock" title={timeLabel(data.eventTime) || 'Time not shared yet'} subtitle="The customer sets this from their portal" />
               <Row icon="pin" multiline title={data.locationName || 'Location not shared yet'}
                 subtitle={[data.locationLandmark && `Landmark: ${data.locationLandmark}`, data.locationNotes].filter(Boolean).join(' · ') || (data.locationName ? 'Open in Maps' : 'The customer adds this from their portal')}
@@ -70,7 +71,7 @@ export default function EventDetailScreen({ eventId }) {
             {user.dataModuleEnabled ? (
               <List>
                 <Row icon="image" tone="brass" title="Photos & videos" subtitle={folders.data ? `${(folders.data || []).length} ${(folders.data || []).length === 1 ? 'folder' : 'folders'}${photoCount ? ` · ${photoCount} items` : ''}` : 'Open gallery'} onClick={() => navigate(`/events/${data.id}/gallery`)} />
-                <Row icon="upload" title="Upload from this phone" onClick={() => navigate(`/events/${data.id}/gallery?upload=1`)} />
+                <Row icon="upload" title="Upload photos" onClick={() => navigate(`/events/${data.id}/gallery?upload=1`)} />
               </List>
             ) : <List><Row icon="image" title="Online galleries" subtitle="Not in your current plan" onClick={() => navigate('/more/plan')} /></List>}
           </Section>
@@ -203,6 +204,7 @@ export function EventManageScreen({ eventId, tab: initialTab }) {
   const { user } = useUser();
   const event = useEvent(eventId);
   const [tab, setTab] = useState(MANAGE_TABS.some(([key]) => key === initialTab) ? initialTab : 'proofs');
+  const embedClass = useEmbedClass();
   const data = event.data;
   useEffect(() => { if (MANAGE_TABS.some(([key]) => key === initialTab)) setTab(initialTab); }, [initialTab]);
   return (
@@ -212,7 +214,7 @@ export function EventManageScreen({ eventId, tab: initialTab }) {
       </div>
       <ErrorNote message={event.error} />
       {!data ? <Skeleton /> : (
-        <div className="m-embed" key={tab}>
+        <div className={embedClass} key={tab}>
           {tab === 'delivery' && <DeliveryTab eventId={data.id} />}
           {tab === 'films' && (hasFeature(user, 'FILMS') ? <FilmsTab eventId={data.id} user={user} /> : <UpgradeNotice feature="FILMS" title="Film delivery">Deliver teasers, highlights and full films alongside photos.</UpgradeNotice>)}
           {tab === 'proofs' && (hasFeature(user, 'ALBUM_PROOFING') ? <ProofsTab eventId={data.id} user={user} /> : <UpgradeNotice feature="ALBUM_PROOFING" title="Album proofing">Share album designs, collect comments per spread and get approval in one place.</UpgradeNotice>)}
